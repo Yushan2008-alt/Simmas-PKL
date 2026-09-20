@@ -149,17 +149,23 @@ export function TambahKunjunganModal({
                 setDudiId(e.target.value);
                 if (errors.dudiId) setErrors((prev) => ({ ...prev, dudiId: undefined }));
               }}
+              disabled={availableDudis.length === 0}
               className={`w-full h-11 px-3.5 rounded-xl border bg-background text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                 errors.dudiId ? "border-red-500 focus:border-red-500" : "border-border focus:border-primary"
               }`}
             >
-              <option value="">-- Pilih DUDI --</option>
+              <option value="">{availableDudis.length === 0 ? "-- Belum ada DUDI siswa bimbingan --" : "-- Pilih DUDI --"}</option>
               {availableDudis.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name} ({d.sector})
                 </option>
               ))}
             </select>
+            {availableDudis.length === 0 && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 p-2.5 rounded-lg border border-amber-300/40">
+                Belum ada DUDI tempat siswa bimbingan Anda magang. Kunjungan monitoring hanya dapat dijadwalkan ke DUDI mitra yang ditempati oleh siswa bimbingan Anda.
+              </p>
+            )}
             {errors.dudiId && (
               <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
                 <AlertCircle className="h-3 w-3" />

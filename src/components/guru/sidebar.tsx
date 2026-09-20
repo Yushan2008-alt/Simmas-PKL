@@ -2,20 +2,16 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
   ClipboardCheck,
   CalendarCheck,
   GraduationCap,
-  LogOut,
   ChevronRight,
-  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { getActiveGuru, logoutUser } from "@/lib/supabase/services";
 
 interface GuruSidebarProps {
   isOpen?: boolean;
@@ -24,18 +20,6 @@ interface GuruSidebarProps {
 
 export function GuruSidebar({ isOpen, onClose }: GuruSidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [guru, setGuru] = React.useState(getActiveGuru());
-
-  React.useEffect(() => {
-    setGuru(getActiveGuru());
-
-    const handleAuthChange = () => setGuru(getActiveGuru());
-    if (typeof window !== "undefined") {
-      window.addEventListener("simmas_auth_changed", handleAuthChange);
-      return () => window.removeEventListener("simmas_auth_changed", handleAuthChange);
-    }
-  }, []);
 
   const menuGroups = [
     {
@@ -69,26 +53,6 @@ export function GuruSidebar({ isOpen, onClose }: GuruSidebarProps) {
       ],
     },
   ];
-
-  const handleLogout = () => {
-    logoutUser();
-    toast.success("Berhasil keluar", {
-      description: "Anda telah keluar dari sesi Guru Pembimbing.",
-    });
-    router.push("/login");
-  };
-
-  const guruInitials =
-    (guru.name || "Guru")
-      .replace(/\b(dr\.|dra\.|drs\.|prof\.|h\.|hj\.|ir\.|m\.kom|s\.kom|s\.pd|m\.pd|s\.t|m\.t|m\.sc|b\.sc|m\.si|s\.si|se|ak)\b/gi, "")
-      .replace(/[^a-zA-Z\s]/g, "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((w) => w[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase() || "GP";
 
   return (
     <>
@@ -165,34 +129,6 @@ export function GuruSidebar({ isOpen, onClose }: GuruSidebarProps) {
               })}
             </div>
           ))}
-        </div>
-
-        {/* User Card & Logout Footer */}
-        <div className="p-4 border-t border-border bg-muted/20">
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-background border border-border/80 shadow-2xs mb-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
-              {guruInitials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-foreground truncate">
-                {guru.name}
-              </p>
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-3 w-3 text-blue-600" />
-                <p className="text-[10px] font-medium text-muted-foreground truncate">
-                  Guru Pembimbing
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>Keluar Sesi</span>
-          </button>
         </div>
       </aside>
     </>

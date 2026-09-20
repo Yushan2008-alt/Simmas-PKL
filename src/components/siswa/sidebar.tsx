@@ -2,21 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FilePlus,
   Camera,
   ClipboardCheck,
-  User,
   GraduationCap,
-  LogOut,
   ChevronRight,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { getActiveSiswa, logoutUser } from "@/lib/supabase/services";
 
 interface SiswaSidebarProps {
   isOpen?: boolean;
@@ -25,22 +21,6 @@ interface SiswaSidebarProps {
 
 export function SiswaSidebar({ isOpen, onClose }: SiswaSidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [siswa, setSiswa] = React.useState(getActiveSiswa());
-
-  React.useEffect(() => {
-    setSiswa(getActiveSiswa());
-
-    const handleSiswaUpdate = () => setSiswa(getActiveSiswa());
-    if (typeof window !== "undefined") {
-      window.addEventListener("simmas_siswa_updated", handleSiswaUpdate);
-      window.addEventListener("simmas_auth_changed", handleSiswaUpdate);
-      return () => {
-        window.removeEventListener("simmas_siswa_updated", handleSiswaUpdate);
-        window.removeEventListener("simmas_auth_changed", handleSiswaUpdate);
-      };
-    }
-  }, []);
 
   const menuGroups = [
     {
@@ -73,27 +53,7 @@ export function SiswaSidebar({ isOpen, onClose }: SiswaSidebarProps) {
         },
       ],
     },
-    {
-      groupLabel: "AKUN",
-      items: [
-        {
-          title: "Profil Siswa",
-          href: "/siswa/profil",
-          icon: User,
-        },
-      ],
-    },
   ];
-
-  const handleLogout = () => {
-    logoutUser();
-    toast.success("Berhasil keluar", {
-      description: "Anda telah keluar dari sesi Siswa SIMMAS.",
-    });
-    router.push("/login");
-  };
-
-  const isSedangMagang = siswa.status === "Sedang Magang";
 
   return (
     <>
@@ -114,7 +74,7 @@ export function SiswaSidebar({ isOpen, onClose }: SiswaSidebarProps) {
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-sm text-white font-bold">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 shadow-sm text-white font-bold">
               <GraduationCap className="h-5 w-5" />
             </div>
             <div className="flex items-center gap-1.5">
@@ -170,43 +130,6 @@ export function SiswaSidebar({ isOpen, onClose }: SiswaSidebarProps) {
               })}
             </div>
           ))}
-        </div>
-
-        {/* User Card & Logout Footer */}
-        <div className="p-4 border-t border-border bg-muted/20">
-          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-background border border-border/80 shadow-2xs mb-3">
-            <div className="h-9 w-9 rounded-xl bg-purple-600/10 text-purple-600 flex items-center justify-center font-bold text-xs shrink-0">
-              {siswa.name.substring(0, 2).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-foreground truncate">
-                {siswa.name}
-              </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span
-                  className={cn(
-                    "px-1.5 py-0.2 rounded text-[9px] font-extrabold",
-                    isSedangMagang
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-amber-50 text-amber-700 border border-amber-200"
-                  )}
-                >
-                  {siswa.status}
-                </span>
-                <span className="text-[10px] text-muted-foreground truncate">
-                  {siswa.class_name}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>Keluar Sesi</span>
-          </button>
         </div>
       </aside>
     </>

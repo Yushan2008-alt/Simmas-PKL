@@ -18,11 +18,13 @@ import {
   RefreshCw,
   UserCheck,
   ArrowUpRight,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   getActiveSiswa,
+  getDefaultSiswa,
   getActivePengajuan,
   getStudentPlacement,
   getTodayAbsensi,
@@ -36,7 +38,7 @@ import { Siswa, PengajuanMagang, Penempatan, Absensi, Jurnal } from "@/types/dat
 import { CameraCaptureModal } from "@/components/siswa/camera-capture-modal";
 
 export default function SiswaDashboardPage() {
-  const [siswa, setSiswa] = React.useState<Siswa>(getActiveSiswa());
+  const [siswa, setSiswa] = React.useState<Siswa>(() => getActiveSiswa());
   const [pengajuan, setPengajuan] = React.useState<PengajuanMagang | null>(null);
   const [placement, setPlacement] = React.useState<Penempatan | null>(null);
   const [todayAbsensi, setTodayAbsensi] = React.useState<Absensi | null>(null);
@@ -77,12 +79,14 @@ export default function SiswaDashboardPage() {
 
     const handleUpdate = () => loadData();
     if (typeof window !== "undefined") {
+      window.addEventListener("simmas_auth_changed", handleUpdate);
       window.addEventListener("simmas_pengajuan_updated", handleUpdate);
       window.addEventListener("simmas_siswa_updated", handleUpdate);
       window.addEventListener("simmas_absensi_updated", handleUpdate);
       window.addEventListener("simmas_jurnal_updated", handleUpdate);
       window.addEventListener("simmas_penempatan_updated", handleUpdate);
       return () => {
+        window.removeEventListener("simmas_auth_changed", handleUpdate);
         window.removeEventListener("simmas_pengajuan_updated", handleUpdate);
         window.removeEventListener("simmas_siswa_updated", handleUpdate);
         window.removeEventListener("simmas_absensi_updated", handleUpdate);
@@ -143,199 +147,74 @@ export default function SiswaDashboardPage() {
     }
   };
 
-  const isBelumMagang = siswa.status === "Belum Magang";
+  const isBelumMagang = siswa.status === "Belum Magang" || !placement;
 
   return (
-    <div className="space-y-8 w-full max-w-7xl mx-auto">
-      {/* Top Banner / Student Greeting */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/60">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/10 text-purple-600">
-              Portal Siswa Magang
-            </span>
-            <span className="text-xs text-muted-foreground">•</span>
-            <span className="text-xs text-muted-foreground">NIS: {siswa.nis}</span>
-            <span className="text-xs text-muted-foreground">•</span>
-            <span className="text-xs text-muted-foreground">{siswa.class_name}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Halo, {siswa.name}
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Kelola pengajuan tempat magang, presensi harian webcam, dan jurnal kegiatan harian.
-          </p>
-        </div>
-
-        {/* Demo Simulator Toggle */}
-        <div className="flex items-center gap-2 shrink-0">
-          {isBelumMagang ? (
-            <Button
-              onClick={handleSimulateVerify}
-              className="rounded-xl h-10 px-4 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>Verifikasi Pengajuan (Simulasi Unlock)</span>
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={handleResetDemo}
-              className="rounded-xl h-10 px-4 text-xs font-semibold gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>Reset Status ke &apos;Belum Magang&apos; (Demo)</span>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* CASE 1: BELUM MAGANG (PUNYA PENGAJUAN MENUNGGU VERIFIKASI) */}
+    <div className="space-y-6 w-full">
+      {/* CASE 1: BELUM MAGANG (SESUAI GAMBAR SCREENSHOT 2) */}
       {isBelumMagang ? (
-        <div className="space-y-6">
-          {/* Active Application Review Banner */}
-          {pengajuan && pengajuan.status === "Menunggu Verifikasi" ? (
-            <div className="rounded-3xl border border-amber-300/80 bg-amber-500/5 p-6 sm:p-8 space-y-4 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600">
-                    <Clock className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
-                      SEDANG DITINJAU SEKOLAH
-                    </span>
-                    <h2 className="text-lg font-bold text-foreground mt-1">
-                      Pengajuan Tempat Magang Anda Sedang Diverifikasi
-                    </h2>
-                  </div>
-                </div>
+        <div className="w-full rounded-2xl sm:rounded-3xl border border-border bg-card p-12 sm:p-20 text-center shadow-xs flex flex-col items-center justify-center min-h-[420px]">
+          <div className="h-16 w-16 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center mb-5">
+            <Send className="h-7 w-7 -rotate-45 ml-1 text-blue-600" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+            Belum Mengajukan Magang
+          </h2>
+          <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-2 mb-7 leading-relaxed">
+            Anda belum mengajukan tempat magang atau pengajuan Anda masih dalam tahap verifikasi oleh Admin.
+          </p>
+          <Link href="/siswa/pengajuan">
+            <Button className="rounded-xl px-7 h-11 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs">
+              Ajukan Tempat Magang Sekarang
+            </Button>
+          </Link>
 
-                <Link href="/siswa/pengajuan">
-                  <Button variant="outline" size="sm" className="rounded-xl text-xs font-bold gap-1 border-amber-300 text-amber-800 hover:bg-amber-100/50">
-                    <span>Lihat Rincian Pengajuan</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-amber-200/60 text-xs">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    DUDI Pilihan
-                  </p>
-                  <p className="font-bold text-foreground text-sm mt-0.5 flex items-center gap-1.5">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    {pengajuan.dudi?.name}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">{pengajuan.dudi?.sector}</p>
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Posisi yang Diajukan
-                  </p>
-                  <p className="font-bold text-foreground text-sm mt-0.5">
-                    {pengajuan.position}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Periode: {pengajuan.start_date} s/d {pengajuan.end_date}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Tanggal Diajukan
-                  </p>
-                  <p className="font-bold text-foreground text-sm mt-0.5 flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    {pengajuan.created_at ? new Date(pengajuan.created_at).toLocaleDateString("id-ID") : "-"}
-                  </p>
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                    Menunggu verifikasi guru koordinator & admin
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* No application yet banner */
-            <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 text-center space-y-3">
-              <Building2 className="h-10 w-10 text-muted-foreground mx-auto opacity-50" />
-              <h2 className="text-lg font-bold text-foreground">
-                Anda Belum Memiliki Pengajuan Magang
-              </h2>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                Silakan pilih mitra industri (DUDI) yang tersedia dan ajukan posisi magang yang Anda minati.
-              </p>
-              <Link href="/siswa/pengajuan">
-                <Button className="rounded-xl font-bold text-xs gap-1.5 mt-2">
-                  <FilePlus className="h-4 w-4" />
-                  <span>Ajukan Tempat Magang Sekarang</span>
-                </Button>
-              </Link>
-            </div>
-          )}
-
-          {/* Locked Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Locked Absensi Card */}
-            <div className="relative rounded-2xl border border-dashed border-border bg-muted/20 p-6 space-y-3 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 rounded-xl bg-muted text-muted-foreground">
-                    <Camera className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Presensi Harian</h3>
-                    <p className="text-xs text-muted-foreground">Presensi Datang & Pulang Webcam</p>
-                  </div>
-                </div>
-                <span className="p-2 rounded-full bg-muted text-muted-foreground">
-                  <Lock className="h-4 w-4" />
-                </span>
-              </div>
-              <div className="p-4 rounded-xl bg-background/60 border border-border text-xs text-muted-foreground space-y-1">
-                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Fitur Terkunci</span>
-                </p>
-                <p className="text-[11px]">
-                  Absensi harian terkunci hingga tempat magang dan guru pembimbing Anda ditetapkan oleh pihak sekolah.
-                </p>
-              </div>
-            </div>
-
-            {/* Locked Jurnal Card */}
-            <div className="relative rounded-2xl border border-dashed border-border bg-muted/20 p-6 space-y-3 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 rounded-xl bg-muted text-muted-foreground">
-                    <ClipboardCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Jurnal Kegiatan</h3>
-                    <p className="text-xs text-muted-foreground">Laporan Aktivitas Harian Siswa</p>
-                  </div>
-                </div>
-                <span className="p-2 rounded-full bg-muted text-muted-foreground">
-                  <Lock className="h-4 w-4" />
-                </span>
-              </div>
-              <div className="p-4 rounded-xl bg-background/60 border border-border text-xs text-muted-foreground space-y-1">
-                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Fitur Terkunci</span>
-                </p>
-                <p className="text-[11px]">
-                  Pengisian jurnal kegiatan harian terkunci hingga Anda resmi ditempatkan di mitra industri (DUDI).
-                </p>
-              </div>
-            </div>
+          {/* Subtle simulation helper for developer/demo test */}
+          <div className="pt-10">
+            <button
+              onClick={handleSimulateVerify}
+              className="text-[11px] text-muted-foreground/60 hover:text-primary transition-colors flex items-center gap-1 mx-auto"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>Simulasi Cepat: Langsung Verifikasi &amp; Masuk ke Magang Aktif</span>
+            </button>
           </div>
         </div>
       ) : (
         /* CASE 2: SEDANG MAGANG (AKTIF PENUH) */
         <div className="space-y-8">
+          {/* Top Banner / Student Greeting */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/60">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/10 text-purple-600">
+                  Portal Siswa Magang
+                </span>
+                <span className="text-xs text-muted-foreground">•</span>
+                <span suppressHydrationWarning className="text-xs text-muted-foreground">NIS: {siswa.nis}</span>
+                <span className="text-xs text-muted-foreground">•</span>
+                <span suppressHydrationWarning className="text-xs text-muted-foreground">{siswa.class_name}</span>
+              </div>
+              <h1 suppressHydrationWarning className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                Halo, {siswa.name}
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Kelola pengajuan tempat magang, presensi harian webcam, dan jurnal kegiatan harian.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                onClick={handleResetDemo}
+                className="rounded-xl h-10 px-4 text-xs font-semibold gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Reset Status ke &apos;Belum Magang&apos; (Demo)</span>
+              </Button>
+            </div>
+          </div>
+
           {/* Active Placement Card */}
           <div className="rounded-3xl border border-emerald-200/80 bg-emerald-500/5 p-6 sm:p-8 space-y-4 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -348,13 +227,13 @@ export default function SiswaDashboardPage() {
                     AKTIF MAGANG
                   </span>
                   <h2 className="text-lg font-bold text-foreground mt-1">
-                    {placement?.dudi?.name || "PT Telkom Indonesia"}
+                    {placement?.dudi?.name || "Mitra Industri DUDI"}
                   </h2>
                 </div>
               </div>
 
               <span className="text-xs text-muted-foreground">
-                Periode: {placement?.start_date || "2026-08-01"} s/d {placement?.end_date || "2026-11-30"}
+                Periode: {placement?.start_date || "-"} s/d {placement?.end_date || "-"}
               </span>
             </div>
 
@@ -364,10 +243,10 @@ export default function SiswaDashboardPage() {
                   Alamat Industri
                 </p>
                 <p className="font-semibold text-foreground mt-0.5">
-                  {placement?.dudi?.address || "Jl. Ketintang No. 156, Surabaya"}
+                  {placement?.dudi?.address || "-"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  PIC: {placement?.dudi?.pic_name || "Rina Wijaya"} ({placement?.dudi?.pic_phone || "081234567891"})
+                  PIC: {placement?.dudi?.pic_name || "-"} ({placement?.dudi?.pic_phone || "-"})
                 </p>
               </div>
 
@@ -376,10 +255,10 @@ export default function SiswaDashboardPage() {
                   Guru Pembimbing
                 </p>
                 <p className="font-bold text-foreground text-sm mt-0.5">
-                  {placement?.teacher?.name || "Dr. Budi Santoso, M.Kom"}
+                  {placement?.teacher?.name || "Belum Ditugaskan"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  NIP: {placement?.teacher?.nip || "198501012010011005"}
+                  NIP: {placement?.teacher?.nip || "-"}
                 </p>
               </div>
 

@@ -19,16 +19,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   getActiveGuru,
+  getDefaultGuru,
   getJurnalList,
   validateJurnal,
   getSupervisedStudentsSummary,
   SupervisedStudentSummary,
 } from "@/lib/supabase/services";
-import { Jurnal, JurnalStatus } from "@/types/database";
+import { Guru, Jurnal, JurnalStatus } from "@/types/database";
 import { RevisiJurnalModal } from "@/components/guru/revisi-jurnal-modal";
 
 export default function GuruJurnalPage() {
-  const guru = getActiveGuru();
+  const [guru, setGuru] = React.useState<Guru>(() => getActiveGuru());
   const [activeTab, setActiveTab] = React.useState<"jurnal" | "presensi">("jurnal");
   const [jurnals, setJurnals] = React.useState<Jurnal[]>([]);
   const [summaries, setSummaries] = React.useState<SupervisedStudentSummary[]>([]);
@@ -40,10 +41,17 @@ export default function GuruJurnalPage() {
   const [revisiJurnal, setRevisiJurnal] = React.useState<Jurnal | null>(null);
 
   const loadData = React.useCallback(async () => {
+    const currentGuru = getActiveGuru();
+    setGuru(currentGuru);
+    if (!currentGuru || !currentGuru.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const [jList, sumList] = await Promise.all([
-        getJurnalList({ teacherId: guru.id }),
-        getSupervisedStudentsSummary(guru.id),
+        getJurnalList({ teacherId: currentGuru.id }),
+        getSupervisedStudentsSummary(currentGuru.id),
       ]);
       setJurnals(jList);
       setSummaries(sumList);
@@ -52,16 +60,23 @@ export default function GuruJurnalPage() {
     } finally {
       setLoading(false);
     }
-  }, [guru.id]);
+  }, []);
 
   React.useEffect(() => {
     loadData();
 
+    const handleAuthChange = () => loadData();
     const handleJurnalUpdate = () => loadData();
+    const handlePenempatanUpdate = () => loadData();
+
     if (typeof window !== "undefined") {
+      window.addEventListener("simmas_auth_changed", handleAuthChange);
       window.addEventListener("simmas_jurnal_updated", handleJurnalUpdate);
+      window.addEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       return () => {
+        window.removeEventListener("simmas_auth_changed", handleAuthChange);
         window.removeEventListener("simmas_jurnal_updated", handleJurnalUpdate);
+        window.removeEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       };
     }
   }, [loadData]);
@@ -100,7 +115,7 @@ export default function GuruJurnalPage() {
   const revisionCount = jurnals.filter((j) => j.status === "Perlu Revisi").length;
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
@@ -153,64 +168,76 @@ export default function GuruJurnalPage() {
       {activeTab === "jurnal" && (
         <div className="space-y-6">
           {/* Status Quick Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setStatusFilter("ALL")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                statusFilter === "ALL"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "bg-card text-muted-foreground border border-border hover:bg-muted"
-              }`}
-            >
-              Semua Status ({jurnals.length})
-            </button>
-            <button
-              onClick={() => setStatusFilter("Pending")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                statusFilter === "Pending"
-                  ? "bg-amber-500 text-white shadow-xs"
-                  : "bg-card text-amber-600 border border-border hover:bg-amber-50"
-              }`}
-            >
-              Menunggu Validasi ({pendingCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter("Disetujui")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                statusFilter === "Disetujui"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "bg-card text-emerald-600 border border-border hover:bg-emerald-50"
-              }`}
-            >
-              Disetujui ({approvedCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter("Perlu Revisi")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                statusFilter === "Perlu Revisi"
-                  ? "bg-red-500 text-white shadow-xs"
-                  : "bg-card text-red-600 border border-border hover:bg-red-50"
-              }`}
-            >
-              Perlu Revisi ({revisionCount})
-            </button>
-          </div>
+          {/* Search & Filter Bar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari siswa atau kegiatan jurnal..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10 rounded-xl bg-card text-xs"
+              />
+            </div>
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Cari berdasarkan nama siswa atau isi kegiatan jurnal..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-11 rounded-xl bg-card"
-            />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "ALL"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                Semua ({jurnals.length})
+              </button>
+              <button
+                onClick={() => setStatusFilter("Pending")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "Pending"
+                    ? "bg-amber-500 text-white shadow-xs"
+                    : "bg-card text-amber-600 border border-border hover:bg-amber-50"
+                }`}
+              >
+                Pending ({pendingCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter("Disetujui")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "Disetujui"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-card text-emerald-600 border border-border hover:bg-emerald-50"
+                }`}
+              >
+                Disetujui ({approvedCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter("Perlu Revisi")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "Perlu Revisi"
+                    ? "bg-red-500 text-white shadow-xs"
+                    : "bg-card text-red-600 border border-border hover:bg-red-50"
+                }`}
+              >
+                Revisi ({revisionCount})
+              </button>
+            </div>
           </div>
 
           {/* Journal List */}
           {loading ? (
             <div className="p-12 text-center text-xs text-muted-foreground">
               Memuat data jurnal...
+            </div>
+          ) : jurnals.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card">
+              <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-bold text-foreground">
+                Belum Ada Laporan Jurnal
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5 max-w-sm mx-auto">
+                Belum ada jurnal kegiatan dari siswa bimbingan Anda. Siswa yang telah ditempatkan akan mengirimkan laporan harian mereka ke sini.
+              </p>
             </div>
           ) : filteredJurnals.length === 0 ? (
             <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card">

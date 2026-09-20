@@ -15,6 +15,10 @@ import {
   Send,
   ChevronRight,
   Filter,
+  Search,
+  ShieldAlert,
+  ArrowRight,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   getActiveSiswa,
+  getDefaultSiswa,
   getJurnalList,
   createJurnalSiswa,
   getStudentPlacement,
@@ -30,7 +35,7 @@ import { Siswa, Jurnal, Penempatan } from "@/types/database";
 import { EditJurnalModal } from "@/components/siswa/edit-jurnal-modal";
 
 export default function SiswaJurnalPage() {
-  const [siswa, setSiswa] = React.useState<Siswa>(getActiveSiswa());
+  const [siswa, setSiswa] = React.useState<Siswa>(() => getActiveSiswa());
   const [placement, setPlacement] = React.useState<Penempatan | null>(null);
   const [jurnals, setJurnals] = React.useState<Jurnal[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -40,6 +45,7 @@ export default function SiswaJurnalPage() {
   const [activity, setActivity] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
+  const [searchTerm, setSearchTerm] = React.useState("");
 
   // Edit modal
   const [editingJurnal, setEditingJurnal] = React.useState<Jurnal | null>(null);
@@ -71,11 +77,15 @@ export default function SiswaJurnalPage() {
 
     const handleUpdate = () => loadData();
     if (typeof window !== "undefined") {
+      window.addEventListener("simmas_auth_changed", handleUpdate);
       window.addEventListener("simmas_jurnal_updated", handleUpdate);
       window.addEventListener("simmas_siswa_updated", handleUpdate);
+      window.addEventListener("simmas_penempatan_updated", handleUpdate);
       return () => {
+        window.removeEventListener("simmas_auth_changed", handleUpdate);
         window.removeEventListener("simmas_jurnal_updated", handleUpdate);
         window.removeEventListener("simmas_siswa_updated", handleUpdate);
+        window.removeEventListener("simmas_penempatan_updated", handleUpdate);
       };
     }
   }, [loadData]);
@@ -107,11 +117,15 @@ export default function SiswaJurnalPage() {
     }
   };
 
-  const isBelumMagang = siswa.status === "Belum Magang";
+  const isBelumMagang = siswa.status === "Belum Magang" || !placement;
 
   const filteredJurnals = jurnals.filter((j) => {
-    if (statusFilter === "ALL") return true;
-    return j.status === statusFilter;
+    const matchStatus = statusFilter === "ALL" || j.status === statusFilter;
+    const matchSearch =
+      !searchTerm ||
+      j.activity.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      j.date.includes(searchTerm);
+    return matchStatus && matchSearch;
   });
 
   const pendingCount = jurnals.filter((j) => j.status === "Pending").length;
@@ -119,52 +133,85 @@ export default function SiswaJurnalPage() {
   const revisionCount = jurnals.filter((j) => j.status === "Perlu Revisi").length;
 
   return (
-    <div className="space-y-8 w-full max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/10 text-purple-600">
-              Laporan Kerja Harian
-            </span>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
-            Jurnal Kegiatan Siswa
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Dokumentasikan pekerjaan harian Anda selama magang di DUDI untuk ditinjau guru pembimbing.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card">
-          <ClipboardCheck className="h-4 w-4 text-primary" />
-          <span className="text-xs font-bold text-foreground">
-            {jurnals.length} Laporan Terkirim
-          </span>
-        </div>
-      </div>
-
-      {/* LOCKED STATE BANNER */}
+    <div className="space-y-6 w-full">
+      {/* CASE 1: BELUM MAGANG (SESUAI GAMBAR SCREENSHOT 4) */}
       {isBelumMagang ? (
-        <div className="rounded-3xl border border-dashed border-border bg-muted/20 p-8 sm:p-12 text-center space-y-4">
-          <div className="p-4 rounded-3xl bg-muted text-muted-foreground inline-block">
-            <Lock className="h-10 w-10 mx-auto" />
+        <div className="space-y-6">
+          {/* Top Warning Banner */}
+          <div className="rounded-2xl border border-amber-300 bg-amber-500/10 p-5 sm:p-6 shadow-2xs">
+            <div className="flex items-start gap-4">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-700 shrink-0 mt-0.5">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <h3 className="text-sm sm:text-base font-bold text-foreground">
+                  Akses Kegiatan Magang Belum Aktif
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Anda belum memiliki tempat magang yang disetujui. Anda baru dapat mengisi absensi harian dan jurnal kegiatan setelah pengajuan tempat magang disetujui oleh Admin.
+                </p>
+                <div className="pt-2">
+                  <Link href="/siswa/pengajuan">
+                    <Button className="rounded-xl px-4 h-9 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs">
+                      <span>Ajukan Tempat Magang</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="max-w-md mx-auto space-y-1.5">
-            <h2 className="text-lg font-bold text-foreground">
-              Jurnal Kegiatan Terkunci
-            </h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Pengisian jurnal harian terkunci hingga tempat magang dan guru pembimbing Anda ditetapkan oleh pihak sekolah.
-            </p>
+
+          {/* Action Bar (Search & Disabled Tulis Jurnal Button) */}
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                disabled
+                placeholder="Cari kegiatan atau kendala..."
+                className="pl-10 h-10 rounded-xl bg-muted/20 text-xs w-full"
+              />
+            </div>
+
+            <Button
+              disabled
+              className="rounded-xl px-5 h-10 text-xs font-bold bg-blue-600/60 text-white cursor-not-allowed opacity-60 gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Tulis Jurnal</span>
+            </Button>
           </div>
-          <div className="pt-2">
-            <Link href="/siswa/pengajuan">
-              <Button className="rounded-xl text-xs font-bold gap-2">
-                <span>Cek Status Pengajuan Magang</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
+
+          {/* Jurnal Table with Book Empty State */}
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-2xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/40 border-b border-border text-[10px] uppercase tracking-wider font-extrabold text-muted-foreground">
+                  <tr>
+                    <th className="px-5 py-3.5">TANGGAL</th>
+                    <th className="px-5 py-3.5">KEGIATAN</th>
+                    <th className="px-5 py-3.5 text-center">FOTO</th>
+                    <th className="px-5 py-3.5 text-center">STATUS</th>
+                    <th className="px-5 py-3.5 text-right">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colSpan={5} className="py-20 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <BookOpen className="h-10 w-10 text-muted-foreground/50" />
+                        <p className="text-xs font-bold text-foreground">
+                          Belum ada jurnal kegiatan.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Tekan tombol &quot;Tulis Jurnal&quot; untuk mulai melaporkan aktivitas.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : (
@@ -204,7 +251,7 @@ export default function SiswaJurnalPage() {
                     <span>Mitra DUDI Penempatan</span>
                   </label>
                   <div className="h-11 px-3.5 rounded-xl border border-border bg-muted/40 flex items-center text-xs font-semibold text-foreground">
-                    {placement?.dudi?.name || "PT Telkom Indonesia"}
+                    {placement?.dudi?.name || "Belum Ditugaskan / Mitra DUDI"}
                   </div>
                 </div>
               </div>
@@ -236,54 +283,66 @@ export default function SiswaJurnalPage() {
             </form>
           </div>
 
-          {/* Journal History & Status Filter */}
+          {/* Journal History & Search/Status Filter */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-foreground">
-                Riwayat Jurnal Magang ({jurnals.length})
+                Riwayat Jurnal Magang ({filteredJurnals.length})
               </h3>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => setStatusFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    statusFilter === "ALL"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                  }`}
-                >
-                  Semua ({jurnals.length})
-                </button>
-                <button
-                  onClick={() => setStatusFilter("Pending")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    statusFilter === "Pending"
-                      ? "bg-amber-500 text-white shadow-xs"
-                      : "bg-card text-amber-600 border border-border hover:bg-amber-50"
-                  }`}
-                >
-                  Pending ({pendingCount})
-                </button>
-                <button
-                  onClick={() => setStatusFilter("Disetujui")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    statusFilter === "Disetujui"
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "bg-card text-emerald-600 border border-border hover:bg-emerald-50"
-                  }`}
-                >
-                  Disetujui ({approvedCount})
-                </button>
-                <button
-                  onClick={() => setStatusFilter("Perlu Revisi")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    statusFilter === "Perlu Revisi"
-                      ? "bg-red-500 text-white shadow-xs"
-                      : "bg-card text-red-600 border border-border hover:bg-red-50"
-                  }`}
-                >
-                  Perlu Revisi ({revisionCount})
-                </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari kegiatan atau tanggal..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-10 rounded-xl bg-card text-xs"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={() => setStatusFilter("ALL")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      statusFilter === "ALL"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    Semua ({jurnals.length})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("Pending")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      statusFilter === "Pending"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "bg-card text-amber-600 border border-border hover:bg-amber-50"
+                    }`}
+                  >
+                    Pending ({pendingCount})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("Disetujui")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      statusFilter === "Disetujui"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-card text-emerald-600 border border-border hover:bg-emerald-50"
+                    }`}
+                  >
+                    Disetujui ({approvedCount})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("Perlu Revisi")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      statusFilter === "Perlu Revisi"
+                        ? "bg-red-500 text-white shadow-xs"
+                        : "bg-card text-red-600 border border-border hover:bg-red-50"
+                    }`}
+                  >
+                    Perlu Revisi ({revisionCount})
+                  </button>
+                </div>
               </div>
             </div>
 

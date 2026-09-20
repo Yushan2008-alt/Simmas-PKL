@@ -17,13 +17,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   getActiveGuru,
+  getDefaultGuru,
   getSupervisedStudentsSummary,
   SupervisedStudentSummary,
 } from "@/lib/supabase/services";
+import { Guru } from "@/types/database";
 import { DetailSiswaModal } from "@/components/guru/detail-siswa-modal";
 
 export default function GuruSiswaPage() {
-  const guru = getActiveGuru();
+  const [guru, setGuru] = React.useState<Guru>(() => getActiveGuru());
   const [summaries, setSummaries] = React.useState<SupervisedStudentSummary[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
@@ -33,28 +35,41 @@ export default function GuruSiswaPage() {
     React.useState<SupervisedStudentSummary | null>(null);
 
   const loadData = React.useCallback(async () => {
+    const currentGuru = getActiveGuru();
+    setGuru(currentGuru);
+    if (!currentGuru || !currentGuru.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const data = await getSupervisedStudentsSummary(guru.id);
+      const data = await getSupervisedStudentsSummary(currentGuru.id);
       setSummaries(data);
     } catch (e) {
       console.error("Failed to load supervised students:", e);
     } finally {
       setLoading(false);
     }
-  }, [guru.id]);
+  }, []);
 
   React.useEffect(() => {
     loadData();
 
+    const handleAuthChange = () => loadData();
     const handleKunjunganUpdate = () => loadData();
     const handleJurnalUpdate = () => loadData();
+    const handlePenempatanUpdate = () => loadData();
 
     if (typeof window !== "undefined") {
+      window.addEventListener("simmas_auth_changed", handleAuthChange);
       window.addEventListener("simmas_kunjungan_updated", handleKunjunganUpdate);
       window.addEventListener("simmas_jurnal_updated", handleJurnalUpdate);
+      window.addEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       return () => {
+        window.removeEventListener("simmas_auth_changed", handleAuthChange);
         window.removeEventListener("simmas_kunjungan_updated", handleKunjunganUpdate);
         window.removeEventListener("simmas_jurnal_updated", handleJurnalUpdate);
+        window.removeEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       };
     }
   }, [loadData]);
@@ -80,7 +95,7 @@ export default function GuruSiswaPage() {
   });
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
@@ -106,44 +121,42 @@ export default function GuruSiswaPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-72">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Cari siswa berdasarkan nama, NIS, atau DUDI..."
+            placeholder="Cari siswa, NIS, DUDI..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-11 rounded-xl bg-card"
+            className="pl-9 h-10 rounded-xl bg-card text-xs"
           />
         </div>
 
-        <div className="flex flex-wrap sm:flex-nowrap gap-2.5">
-          <select
-            value={selectedDudi}
-            onChange={(e) => setSelectedDudi(e.target.value)}
-            className="h-11 px-3.5 rounded-xl border border-border bg-card text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="ALL">Semua DUDI ({uniqueDudis.length})</option>
-            {uniqueDudis.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+        <select
+          value={selectedDudi}
+          onChange={(e) => setSelectedDudi(e.target.value)}
+          className="h-10 px-3.5 rounded-xl border border-border bg-card text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          <option value="ALL">Semua DUDI ({uniqueDudis.length})</option>
+          {uniqueDudis.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
 
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="h-11 px-3.5 rounded-xl border border-border bg-card text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="ALL">Semua Kelas</option>
-            {uniqueClasses.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select
+          value={selectedClass}
+          onChange={(e) => setSelectedClass(e.target.value)}
+          className="h-10 px-3.5 rounded-xl border border-border bg-card text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          <option value="ALL">Semua Kelas</option>
+          {uniqueClasses.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Students Table */}
@@ -168,10 +181,24 @@ export default function GuruSiswaPage() {
                     Memuat data siswa bimbingan...
                   </td>
                 </tr>
+              ) : summaries.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="max-w-md mx-auto space-y-2">
+                      <Users className="h-10 w-10 text-muted-foreground mx-auto opacity-40 mb-2" />
+                      <p className="text-sm font-bold text-foreground">
+                        Belum Ada Siswa Bimbingan
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Anda belum memiliki siswa magang yang ditugaskan ke akun Anda. Siswa akan otomatis muncul di sini setelah Administrator melakukan penempatan magang.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                    Tidak ditemukan siswa yang sesuai kriteria pencarian.
+                    Tidak ditemukan siswa yang sesuai kriteria pencarian atau filter.
                   </td>
                 </tr>
               ) : (

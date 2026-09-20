@@ -392,6 +392,9 @@ export async function createGuru(input: Omit<Guru, "id" | "created_at">): Promis
       const { data, error } = await supabase.from("guru").insert([newGuru]).select().single();
       if (!error && data) {
         await logAudit("GURU_CREATED", newGuru.name, "INFO", { nip: newGuru.nip });
+        fallbackGuru = fallbackGuru.filter((g) => g.id !== (data as Guru).id);
+        fallbackGuru.unshift(data as Guru);
+        saveFallback("guru", fallbackGuru);
         return data as Guru;
       }
     } catch (e) {
@@ -400,6 +403,7 @@ export async function createGuru(input: Omit<Guru, "id" | "created_at">): Promis
   }
 
   fallbackGuru.unshift(newGuru);
+  saveFallback("guru", fallbackGuru);
   await logAudit("GURU_CREATED", newGuru.name, "INFO", { nip: newGuru.nip });
   return newGuru;
 }
@@ -415,6 +419,13 @@ export async function updateGuru(id: string, updates: Partial<Guru>): Promise<Gu
         .single();
       if (!error && data) {
         await logAudit("GURU_UPDATED", updates.name || id, "INFO", updates);
+        const idx = fallbackGuru.findIndex((g) => g.id === id);
+        if (idx !== -1) {
+          fallbackGuru[idx] = data as Guru;
+        } else {
+          fallbackGuru.unshift(data as Guru);
+        }
+        saveFallback("guru", fallbackGuru);
         return data as Guru;
       }
     } catch (e) {
@@ -425,6 +436,7 @@ export async function updateGuru(id: string, updates: Partial<Guru>): Promise<Gu
   const idx = fallbackGuru.findIndex((g) => g.id === id);
   if (idx !== -1) {
     fallbackGuru[idx] = { ...fallbackGuru[idx], ...updates, updated_at: new Date().toISOString() };
+    saveFallback("guru", fallbackGuru);
     await logAudit("GURU_UPDATED", fallbackGuru[idx].name, "INFO", updates);
     return fallbackGuru[idx];
   }
@@ -433,11 +445,16 @@ export async function updateGuru(id: string, updates: Partial<Guru>): Promise<Gu
 
 export async function deleteGuru(id: string): Promise<boolean> {
   let targetName = id;
+  const found = fallbackGuru.find((g) => g.id === id);
+  if (found) targetName = found.name;
+
   if (isLiveSupabase()) {
     try {
       const { error } = await supabase.from("guru").delete().eq("id", id);
       if (!error) {
         await logAudit("GURU_DELETED", targetName, "WARNING");
+        fallbackGuru = fallbackGuru.filter((g) => g.id !== id);
+        saveFallback("guru", fallbackGuru);
         return true;
       }
     } catch (e) {
@@ -445,9 +462,8 @@ export async function deleteGuru(id: string): Promise<boolean> {
     }
   }
 
-  const found = fallbackGuru.find((g) => g.id === id);
-  if (found) targetName = found.name;
   fallbackGuru = fallbackGuru.filter((g) => g.id !== id);
+  saveFallback("guru", fallbackGuru);
   await logAudit("GURU_DELETED", targetName, "WARNING");
   return true;
 }
@@ -482,6 +498,9 @@ export async function createSiswa(input: Omit<Siswa, "id" | "created_at">): Prom
       const { data, error } = await supabase.from("siswa").insert([newSiswa]).select().single();
       if (!error && data) {
         await logAudit("SISWA_CREATED", newSiswa.name, "INFO", { nis: newSiswa.nis });
+        fallbackSiswa = fallbackSiswa.filter((s) => s.id !== (data as Siswa).id);
+        fallbackSiswa.unshift(data as Siswa);
+        saveFallback("siswa", fallbackSiswa);
         return data as Siswa;
       }
     } catch (e) {
@@ -490,6 +509,7 @@ export async function createSiswa(input: Omit<Siswa, "id" | "created_at">): Prom
   }
 
   fallbackSiswa.unshift(newSiswa);
+  saveFallback("siswa", fallbackSiswa);
   await logAudit("SISWA_CREATED", newSiswa.name, "INFO", { nis: newSiswa.nis });
   return newSiswa;
 }
@@ -505,6 +525,13 @@ export async function updateSiswa(id: string, updates: Partial<Siswa>): Promise<
         .single();
       if (!error && data) {
         await logAudit("SISWA_UPDATED", updates.name || id, "INFO", updates);
+        const idx = fallbackSiswa.findIndex((s) => s.id === id);
+        if (idx !== -1) {
+          fallbackSiswa[idx] = data as Siswa;
+        } else {
+          fallbackSiswa.unshift(data as Siswa);
+        }
+        saveFallback("siswa", fallbackSiswa);
         return data as Siswa;
       }
     } catch (e) {
@@ -515,6 +542,7 @@ export async function updateSiswa(id: string, updates: Partial<Siswa>): Promise<
   const idx = fallbackSiswa.findIndex((s) => s.id === id);
   if (idx !== -1) {
     fallbackSiswa[idx] = { ...fallbackSiswa[idx], ...updates, updated_at: new Date().toISOString() };
+    saveFallback("siswa", fallbackSiswa);
     await logAudit("SISWA_UPDATED", fallbackSiswa[idx].name, "INFO", updates);
     return fallbackSiswa[idx];
   }
@@ -523,11 +551,16 @@ export async function updateSiswa(id: string, updates: Partial<Siswa>): Promise<
 
 export async function deleteSiswa(id: string): Promise<boolean> {
   let targetName = id;
+  const found = fallbackSiswa.find((s) => s.id === id);
+  if (found) targetName = found.name;
+
   if (isLiveSupabase()) {
     try {
       const { error } = await supabase.from("siswa").delete().eq("id", id);
       if (!error) {
         await logAudit("SISWA_DELETED", targetName, "WARNING");
+        fallbackSiswa = fallbackSiswa.filter((s) => s.id !== id);
+        saveFallback("siswa", fallbackSiswa);
         return true;
       }
     } catch (e) {
@@ -535,9 +568,8 @@ export async function deleteSiswa(id: string): Promise<boolean> {
     }
   }
 
-  const found = fallbackSiswa.find((s) => s.id === id);
-  if (found) targetName = found.name;
   fallbackSiswa = fallbackSiswa.filter((s) => s.id !== id);
+  saveFallback("siswa", fallbackSiswa);
   await logAudit("SISWA_DELETED", targetName, "WARNING");
   return true;
 }
@@ -864,16 +896,18 @@ export async function clearAuditLogs(): Promise<boolean> {
 // GURU & BIMBINGAN SERVICES
 // ==========================================
 export function generateCredentialsFromName(name: string): { email: string; password: string } {
-  // First clean compound degrees with dots like m.kom, s.pd, etc.
-  let cleaned = name.replace(/(^|\s)(m\.kom|s\.kom|s\.pd|m\.pd|s\.t|m\.t|m\.sc|b\.sc|m\.si|s\.si|ph\.d)($|\s|,|\.)/gi, " ");
-
-  // Replace punctuation
-  cleaned = cleaned.replace(/[.,\-_/()]/g, " ");
+  // Strip all variations of academic titles and honorifics first
+  let cleaned = name
+    .replace(/\b(dr|dra|drs|prof|h|hj|ir|spd|mpd|skom|mkom|st|mt|msc|bsc|msi|ssi|phd|se|ak|mm|sh|mh|s\.pd|m\.pd|s\.kom|m\.kom|s\.t|m\.t|m\.sc|b\.sc|m\.si|s\.si|ph\.d|s\.e|s\.h|m\.h|dr\.|dra\.|drs\.|prof\.|ir\.)\b/gi, " ")
+    .replace(/[.,\-_/()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   // Title tokens (single words or acronyms)
   const titles = new Set([
-    "dr", "dra", "drs", "prof", "h", "hj", "ir", "se", "ak", "mm",
-    "mkom", "skom", "spd", "mpd", "st", "mt", "msc", "bsc", "msi", "ssi", "phd"
+    "dr", "dra", "drs", "prof", "h", "hj", "ir", "se", "ak", "mm", "sh", "mh",
+    "mkom", "skom", "spd", "mpd", "st", "mt", "msc", "bsc", "msi", "ssi", "phd",
+    "s", "m", "pd", "kom", "t"
   ]);
 
   const words = cleaned
@@ -904,20 +938,27 @@ export function getActiveGuru(): Guru {
       const stored = localStorage.getItem("simmas_current_user");
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.role === "Guru") {
-          if (parsed.rawUser) return parsed.rawUser as Guru;
+        const role = (parsed.role || "").toLowerCase();
+        if (role === "guru") {
+          // If rawUser is a valid object with name, use it directly
+          if (parsed.rawUser && typeof parsed.rawUser === "object" && parsed.rawUser.name) {
+            return parsed.rawUser as Guru;
+          }
+          // Try finding in fallbackGuru
           const found = fallbackGuru.find(
-            (g) => g.id === parsed.id || g.email.toLowerCase() === (parsed.email || "").toLowerCase()
+            (g) => g.id === parsed.id || (parsed.email && g.email.toLowerCase() === parsed.email.toLowerCase())
           );
           if (found) return found;
+
+          // Build guru object preserving the logged in identity - NEVER override with Dr. Budi
           return {
-            id: parsed.id,
-            nip: parsed.nip || "198501012010011005",
-            name: parsed.name,
-            email: parsed.email,
-            department: parsed.department || "Rekayasa Perangkat Lunak",
-            status: "Aktif",
-            created_at: new Date().toISOString(),
+            id: parsed.id || "g-custom",
+            nip: parsed.nip || parsed.rawUser?.nip || "-",
+            name: parsed.name || parsed.rawUser?.name || "Guru Pembimbing",
+            email: parsed.email || parsed.rawUser?.email || "guru@simmas.sch.id",
+            department: parsed.department || parsed.rawUser?.department || "Rekayasa Perangkat Lunak",
+            status: parsed.status || parsed.rawUser?.status || "Aktif",
+            created_at: parsed.created_at || new Date().toISOString(),
           };
         }
       }
@@ -936,6 +977,21 @@ export function getActiveGuru(): Guru {
       created_at: new Date().toISOString(),
     }
   );
+}
+
+const staticDefaultGuru: Guru = {
+  id: "g-01",
+  nip: "198501012010011005",
+  name: "Dr. Budi Santoso, M.Kom",
+  email: "guru@simmas.sch.id",
+  phone: "081234567890",
+  department: "Teknik Komputer & Jaringan",
+  status: "Aktif",
+  created_at: "2026-01-01T00:00:00.000Z",
+};
+
+export function getDefaultGuru(): Guru {
+  return staticDefaultGuru;
 }
 
 // ==========================================
@@ -1108,6 +1164,20 @@ export async function getJurnalList(filter?: {
 }): Promise<Jurnal[]> {
   if (isLiveSupabase()) {
     try {
+      let allowedStudentIds: string[] | null = null;
+
+      if (filter?.teacherId) {
+        const { data: teacherPlacements } = await supabase
+          .from("penempatan")
+          .select("student_id")
+          .eq("teacher_id", filter.teacherId);
+
+        if (!teacherPlacements || teacherPlacements.length === 0) {
+          return []; // Guru ini belum memiliki siswa bimbingan
+        }
+        allowedStudentIds = teacherPlacements.map((p) => p.student_id);
+      }
+
       let query = supabase
         .from("jurnal")
         .select(`
@@ -1116,6 +1186,9 @@ export async function getJurnalList(filter?: {
         `)
         .order("date", { ascending: false });
 
+      if (allowedStudentIds !== null) {
+        query = query.in("student_id", allowedStudentIds);
+      }
       if (filter?.studentId) {
         query = query.eq("student_id", filter.studentId);
       }
@@ -1254,11 +1327,84 @@ export interface SupervisedStudentSummary {
 }
 
 export async function getSupervisedStudentsSummary(
-  teacherId: string = "g-01"
+  teacherId?: string
 ): Promise<SupervisedStudentSummary[]> {
-  // 1. Get placements for this teacher
-  const placements = fallbackPenempatan.filter((p) => p.teacher_id === teacherId);
+  if (!teacherId) return [];
 
+  if (isLiveSupabase()) {
+    try {
+      const { data: placements, error } = await supabase
+        .from("penempatan")
+        .select(`
+          *,
+          student:siswa(*),
+          dudi:dudi(*),
+          teacher:guru(*)
+        `)
+        .eq("teacher_id", teacherId);
+
+      if (!error && placements) {
+        if (placements.length === 0) return [];
+
+        const summaries: SupervisedStudentSummary[] = [];
+
+        for (const p of placements) {
+          const student = p.student as Siswa;
+          const dudi = p.dudi as Dudi;
+          if (!student || !dudi) continue;
+
+          // Jurnals for this student
+          const { data: studentJurnals } = await supabase
+            .from("jurnal")
+            .select("*")
+            .eq("student_id", p.student_id);
+
+          const jList = (studentJurnals as Jurnal[]) || [];
+          const pendingJurnal = jList.filter((j) => j.status === "Pending").length;
+          const approvedJurnal = jList.filter((j) => j.status === "Disetujui").length;
+          const revisionJurnal = jList.filter((j) => j.status === "Perlu Revisi").length;
+
+          // Absensi for this student
+          const { data: studentAbsensi } = await supabase
+            .from("absensi")
+            .select("*")
+            .eq("student_id", p.student_id);
+
+          const aList = (studentAbsensi as Absensi[]) || [];
+          const hadirCount = aList.filter((a) => a.status === "Hadir").length;
+          const sakitCount = aList.filter((a) => a.status === "Sakit").length;
+          const izinCount = aList.filter((a) => a.status === "Izin").length;
+          const alfaCount = aList.filter((a) => a.status === "Alfa").length;
+          const totalRecorded = hadirCount + sakitCount + izinCount + alfaCount;
+
+          const attendanceRate =
+            totalRecorded > 0 ? Math.round((hadirCount / totalRecorded) * 100) : 100;
+
+          summaries.push({
+            student,
+            dudi,
+            penempatan: p as Penempatan,
+            totalJurnal: jList.length,
+            pendingJurnal,
+            approvedJurnal,
+            revisionJurnal,
+            hadirCount,
+            sakitCount,
+            izinCount,
+            alfaCount,
+            attendanceRate,
+          });
+        }
+
+        return summaries;
+      }
+    } catch (e) {
+      console.warn("Fetch supervised students live error:", e);
+    }
+  }
+
+  // Fallback mode
+  const placements = fallbackPenempatan.filter((p) => p.teacher_id === teacherId);
   const summaries: SupervisedStudentSummary[] = [];
 
   for (const p of placements) {
@@ -1311,6 +1457,10 @@ export interface AuthUser {
   name: string;
   email: string;
   role: "Admin" | "Guru" | "Siswa";
+  department?: string;
+  nip?: string;
+  nis?: string;
+  class_name?: string;
   rawUser?: any;
 }
 
@@ -1320,20 +1470,24 @@ export function getActiveSiswa(): Siswa {
       const stored = localStorage.getItem("simmas_current_user");
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.role === "Siswa") {
-          if (parsed.rawUser) return parsed.rawUser as Siswa;
+        const role = (parsed.role || "").toLowerCase();
+        if (role === "siswa") {
+          if (parsed.rawUser && typeof parsed.rawUser === "object" && parsed.rawUser.name) {
+            return parsed.rawUser as Siswa;
+          }
           const found = fallbackSiswa.find(
-            (s) => s.id === parsed.id || s.email.toLowerCase() === (parsed.email || "").toLowerCase()
+            (s) => s.id === parsed.id || (parsed.email && s.email.toLowerCase() === parsed.email.toLowerCase())
           );
           if (found) return found;
+
           return {
-            id: parsed.id,
-            nis: parsed.nis || "0000",
-            name: parsed.name,
-            email: parsed.email,
-            class_name: parsed.class_name || "XII RPL 1",
-            status: parsed.status || "Belum Magang",
-            created_at: new Date().toISOString(),
+            id: parsed.id || "s-custom",
+            nis: parsed.nis || parsed.rawUser?.nis || "-",
+            name: parsed.name || parsed.rawUser?.name || "Siswa Magang",
+            email: parsed.email || parsed.rawUser?.email || "siswa@simmas.sch.id",
+            class_name: parsed.class_name || parsed.rawUser?.class_name || "XII RPL",
+            status: parsed.status || parsed.rawUser?.status || "Belum Magang",
+            created_at: parsed.created_at || new Date().toISOString(),
           };
         }
       }
@@ -1342,16 +1496,22 @@ export function getActiveSiswa(): Siswa {
 
   return (
     fallbackSiswa.find((s) => s.id === "s-01" || s.email === "siswa@simmas.sch.id") ||
-    fallbackSiswa[0] || {
-      id: "s-01",
-      nis: "21221001",
-      name: "Ahmad Zaki Pratama",
-      email: "siswa@simmas.sch.id",
-      class_name: "XII RPL 1",
-      status: "Belum Magang",
-      created_at: new Date().toISOString(),
-    }
+    fallbackSiswa[0] || staticDefaultSiswa
   );
+}
+
+const staticDefaultSiswa: Siswa = {
+  id: "s-01",
+  nis: "21221001",
+  name: "Ahmad Zaki Pratama",
+  email: "siswa@simmas.sch.id",
+  class_name: "XII RPL 1",
+  status: "Belum Magang",
+  created_at: "2026-01-01T00:00:00.000Z",
+};
+
+export function getDefaultSiswa(): Siswa {
+  return staticDefaultSiswa;
 }
 
 export function logoutUser(): void {
@@ -1370,6 +1530,7 @@ export async function authenticateUser(
 ): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
   const cleanEmail = emailInput.trim().toLowerCase();
   const cleanPass = passwordInput.trim().toLowerCase();
+  const inputCleanAlpha = cleanEmail.replace(/[^a-z0-9]/g, "");
 
   // 1. Check Admin
   if (
@@ -1395,23 +1556,35 @@ export async function authenticateUser(
   const siswaList = await getSiswaList();
   const foundSiswa = siswaList.find((s) => {
     const sEmail = (s.email || "").toLowerCase();
+    const sEmailUser = sEmail.split("@")[0];
     const creds = generateCredentialsFromName(s.name);
+    const credsUser = creds.email.toLowerCase().split("@")[0];
+    const cleanName = s.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
     return (
       sEmail === cleanEmail ||
+      sEmailUser === cleanEmail ||
       creds.email.toLowerCase() === cleanEmail ||
-      s.nis.toLowerCase() === cleanEmail ||
-      s.name.toLowerCase().replace(/\s+/g, "") === cleanEmail
+      credsUser === cleanEmail ||
+      (s.nis && s.nis.toLowerCase() === cleanEmail) ||
+      cleanName === inputCleanAlpha ||
+      (inputCleanAlpha.length >= 3 && (cleanName.includes(inputCleanAlpha) || sEmailUser.includes(inputCleanAlpha)))
     );
   });
 
   if (foundSiswa) {
     const expectedCreds = generateCredentialsFromName(foundSiswa.name);
+    const cleanExpectedPass = expectedCreds.password.toLowerCase();
+    const cleanEmailUser = (foundSiswa.email || "").split("@")[0].toLowerCase();
+    const cleanNameOnly = foundSiswa.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
     const isValidPass =
-      cleanPass === expectedCreds.password ||
+      cleanPass === cleanExpectedPass ||
+      cleanPass === cleanEmailUser ||
       cleanPass === "smk12345" ||
       cleanPass === "siswa" ||
-      cleanPass === foundSiswa.nis.toLowerCase() ||
-      cleanPass === foundSiswa.name.toLowerCase().replace(/\s+/g, "");
+      (foundSiswa.nis && cleanPass === foundSiswa.nis.toLowerCase()) ||
+      cleanPass === cleanNameOnly;
 
     if (!isValidPass && passwordInput.length > 0) {
       return { success: false, error: "Password siswa tidak cocok." };
@@ -1422,6 +1595,8 @@ export async function authenticateUser(
       name: foundSiswa.name,
       email: foundSiswa.email || expectedCreds.email,
       role: "Siswa",
+      class_name: foundSiswa.class_name,
+      nis: foundSiswa.nis,
       rawUser: foundSiswa,
     };
 
@@ -1437,23 +1612,35 @@ export async function authenticateUser(
   const guruList = await getGuruList();
   const foundGuru = guruList.find((g) => {
     const gEmail = (g.email || "").toLowerCase();
+    const gEmailUser = gEmail.split("@")[0];
     const creds = generateCredentialsFromName(g.name);
+    const credsUser = creds.email.toLowerCase().split("@")[0];
+    const cleanName = g.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
     return (
       gEmail === cleanEmail ||
+      gEmailUser === cleanEmail ||
       creds.email.toLowerCase() === cleanEmail ||
-      g.nip.toLowerCase() === cleanEmail ||
-      g.name.toLowerCase().replace(/\s+/g, "") === cleanEmail
+      credsUser === cleanEmail ||
+      (g.nip && g.nip.toLowerCase() === cleanEmail) ||
+      cleanName === inputCleanAlpha ||
+      (inputCleanAlpha.length >= 3 && (cleanName.includes(inputCleanAlpha) || gEmailUser.includes(inputCleanAlpha)))
     );
   });
 
   if (foundGuru) {
     const expectedCreds = generateCredentialsFromName(foundGuru.name);
+    const cleanExpectedPass = expectedCreds.password.toLowerCase();
+    const cleanEmailUser = (foundGuru.email || "").split("@")[0].toLowerCase();
+    const cleanNameOnly = foundGuru.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
     const isValidPass =
-      cleanPass === expectedCreds.password ||
+      cleanPass === cleanExpectedPass ||
+      cleanPass === cleanEmailUser ||
       cleanPass === "smk12345" ||
       cleanPass === "guru" ||
-      cleanPass === foundGuru.nip.toLowerCase() ||
-      cleanPass === foundGuru.name.toLowerCase().replace(/\s+/g, "");
+      (foundGuru.nip && cleanPass === foundGuru.nip.toLowerCase()) ||
+      cleanPass === cleanNameOnly;
 
     if (!isValidPass && passwordInput.length > 0) {
       return { success: false, error: "Password guru tidak cocok." };
@@ -1464,6 +1651,8 @@ export async function authenticateUser(
       name: foundGuru.name,
       email: foundGuru.email || expectedCreds.email,
       role: "Guru",
+      department: foundGuru.department,
+      nip: foundGuru.nip,
       rawUser: foundGuru,
     };
 

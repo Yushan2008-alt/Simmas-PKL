@@ -13,11 +13,14 @@ import {
   ChevronRight,
   UserCheck,
   Image as ImageIcon,
+  ShieldAlert,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   getActiveSiswa,
+  getDefaultSiswa,
   getTodayAbsensi,
   getAbsensiList,
   checkInSiswa,
@@ -28,7 +31,7 @@ import { Siswa, Absensi, Penempatan } from "@/types/database";
 import { CameraCaptureModal } from "@/components/siswa/camera-capture-modal";
 
 export default function SiswaAbsensiPage() {
-  const [siswa, setSiswa] = React.useState<Siswa>(getActiveSiswa());
+  const [siswa, setSiswa] = React.useState<Siswa>(() => getActiveSiswa());
   const [placement, setPlacement] = React.useState<Penempatan | null>(null);
   const [todayAbsensi, setTodayAbsensi] = React.useState<Absensi | null>(null);
   const [history, setHistory] = React.useState<Absensi[]>([]);
@@ -68,11 +71,15 @@ export default function SiswaAbsensiPage() {
 
     const handleUpdate = () => loadData();
     if (typeof window !== "undefined") {
+      window.addEventListener("simmas_auth_changed", handleUpdate);
       window.addEventListener("simmas_absensi_updated", handleUpdate);
       window.addEventListener("simmas_siswa_updated", handleUpdate);
+      window.addEventListener("simmas_penempatan_updated", handleUpdate);
       return () => {
+        window.removeEventListener("simmas_auth_changed", handleUpdate);
         window.removeEventListener("simmas_absensi_updated", handleUpdate);
         window.removeEventListener("simmas_siswa_updated", handleUpdate);
+        window.removeEventListener("simmas_penempatan_updated", handleUpdate);
       };
     }
   }, [loadData]);
@@ -98,7 +105,7 @@ export default function SiswaAbsensiPage() {
     }
   };
 
-  const isBelumMagang = siswa.status === "Belum Magang";
+  const isBelumMagang = siswa.status === "Belum Magang" || !placement;
   const todayFormatted = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -107,50 +114,94 @@ export default function SiswaAbsensiPage() {
   });
 
   return (
-    <div className="space-y-8 w-full max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/10 text-purple-600">
-              Presensi 2x Harian
-            </span>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
-            Presensi Harian Siswa
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Presensi Datang & Pulang wajib terverifikasi dengan foto langsung webcam tanpa file upload.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card">
-          <Calendar className="h-4 w-4 text-primary" />
-          <span className="text-xs font-bold text-foreground">{todayFormatted}</span>
-        </div>
-      </div>
-
-      {/* LOCKED STATE BANNER */}
+    <div className="space-y-6 w-full">
+      {/* CASE 1: BELUM MAGANG (SESUAI GAMBAR SCREENSHOT 3) */}
       {isBelumMagang ? (
-        <div className="rounded-3xl border border-dashed border-border bg-muted/20 p-8 sm:p-12 text-center space-y-4">
-          <div className="p-4 rounded-3xl bg-muted text-muted-foreground inline-block">
-            <Lock className="h-10 w-10 mx-auto" />
+        <div className="space-y-6">
+          {/* Top Warning Banner */}
+          <div className="rounded-2xl border border-amber-300 bg-amber-500/10 p-5 sm:p-6 shadow-2xs">
+            <div className="flex items-start gap-4">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-700 shrink-0 mt-0.5">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <h3 className="text-sm sm:text-base font-bold text-foreground">
+                  Akses Kegiatan Magang Belum Aktif
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Anda belum memiliki tempat magang yang disetujui. Anda baru dapat mengisi absensi harian dan jurnal kegiatan setelah pengajuan tempat magang disetujui oleh Admin.
+                </p>
+                <div className="pt-2">
+                  <Link href="/siswa/pengajuan">
+                    <Button className="rounded-xl px-4 h-9 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs">
+                      <span>Ajukan Tempat Magang</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="max-w-md mx-auto space-y-1.5">
-            <h2 className="text-lg font-bold text-foreground">
-              Presensi Terkunci
-            </h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Absensi harian terkunci hingga tempat magang dan guru pembimbing Anda ditetapkan oleh pihak sekolah.
-            </p>
-          </div>
-          <div className="pt-2">
-            <Link href="/siswa/pengajuan">
-              <Button className="rounded-xl text-xs font-bold gap-2">
-                <span>Cek Status Pengajuan Magang</span>
-                <ChevronRight className="h-3.5 w-3.5" />
+
+          {/* Status Kehadiran Hari Ini (Disabled) */}
+          <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300 shrink-0">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">
+                  Status Kehadiran Hari Ini
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Absensi terkunci hingga tempat magang dan guru pembimbing ditetapkan
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Button
+                disabled
+                className="rounded-xl px-4 h-10 text-xs font-bold bg-blue-600/60 text-white cursor-not-allowed opacity-60"
+              >
+                <span>→ Clock In</span>
               </Button>
-            </Link>
+              <Button
+                disabled
+                className="rounded-xl px-4 h-10 text-xs font-bold bg-amber-500/60 text-white cursor-not-allowed opacity-60"
+              >
+                <span>🚪 Clock Out</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Riwayat Bulan Ini Table */}
+          <div className="space-y-3">
+            <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              RIWAYAT BULAN INI
+            </h4>
+            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 border-b border-border text-[10px] uppercase tracking-wider font-extrabold text-muted-foreground">
+                    <tr>
+                      <th className="px-5 py-3.5">TANGGAL</th>
+                      <th className="px-5 py-3.5">STATUS</th>
+                      <th className="px-5 py-3.5">MASUK</th>
+                      <th className="px-5 py-3.5">PULANG</th>
+                      <th className="px-5 py-3.5 text-center">FOTO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={5} className="py-16 text-center text-xs text-muted-foreground">
+                        Belum ada riwayat absensi.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
@@ -201,18 +252,19 @@ export default function SiswaAbsensiPage() {
                 </div>
 
                 {todayAbsensi?.check_in_time ? (
-                  <div className="p-3.5 rounded-xl bg-background border border-border flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-background border border-border flex items-center gap-3">
                     {todayAbsensi.check_in_photo ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={todayAbsensi.check_in_photo}
                         alt="Foto Datang"
+                        title="Klik untuk memperbesar"
                         onClick={() => setPreviewPhoto(todayAbsensi.check_in_photo || null)}
-                        className="h-14 w-14 rounded-xl object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        className="h-10 w-10 rounded-lg object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                       />
                     ) : (
-                      <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                        <ImageIcon className="h-6 w-6" />
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <ImageIcon className="h-5 w-5" />
                       </div>
                     )}
                     <div>
@@ -221,9 +273,6 @@ export default function SiswaAbsensiPage() {
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
                         Status: <span className="font-semibold text-emerald-600">Hadir Tepat Waktu</span>
-                      </p>
-                      <p className="text-[10px] text-primary font-medium mt-0.5">
-                        Klik thumbnail foto untuk memperbesar
                       </p>
                     </div>
                   </div>
@@ -268,18 +317,19 @@ export default function SiswaAbsensiPage() {
                 </div>
 
                 {todayAbsensi?.check_out_time ? (
-                  <div className="p-3.5 rounded-xl bg-background border border-border flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-background border border-border flex items-center gap-3">
                     {todayAbsensi.check_out_photo ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={todayAbsensi.check_out_photo}
                         alt="Foto Pulang"
+                        title="Klik untuk memperbesar"
                         onClick={() => setPreviewPhoto(todayAbsensi.check_out_photo || null)}
-                        className="h-14 w-14 rounded-xl object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        className="h-10 w-10 rounded-lg object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                       />
                     ) : (
-                      <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                        <ImageIcon className="h-6 w-6" />
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <ImageIcon className="h-5 w-5" />
                       </div>
                     )}
                     <div>
@@ -288,9 +338,6 @@ export default function SiswaAbsensiPage() {
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
                         Status: <span className="font-semibold text-blue-600">Selesai Hari Kerja</span>
-                      </p>
-                      <p className="text-[10px] text-primary font-medium mt-0.5">
-                        Klik thumbnail foto untuk memperbesar
                       </p>
                     </div>
                   </div>
@@ -351,11 +398,11 @@ export default function SiswaAbsensiPage() {
                   ) : (
                     history.map((a) => (
                       <tr key={a.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 font-bold text-foreground">
+                        <td className="px-6 py-3.5 font-bold text-foreground">
                           {a.date}
                         </td>
 
-                        <td className="px-4 py-4 text-center">
+                        <td className="px-4 py-3.5 text-center">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                               a.status === "Hadir"
@@ -371,41 +418,51 @@ export default function SiswaAbsensiPage() {
                           </span>
                         </td>
 
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2.5">
-                            {a.check_in_photo && (
+                        <td className="px-6 py-3.5">
+                          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/80">
+                            {a.check_in_photo ? (
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img
                                 src={a.check_in_photo}
                                 alt="Foto Masuk"
+                                title="Klik untuk memperbesar"
                                 onClick={() => setPreviewPhoto(a.check_in_photo || null)}
-                                className="h-9 w-9 rounded-lg object-cover border border-border cursor-pointer hover:opacity-80"
+                                className="h-6 w-6 rounded-md object-cover border border-border cursor-pointer hover:scale-110 transition-transform shadow-2xs shrink-0"
                               />
+                            ) : (
+                              <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground/60 shrink-0">
+                                <ImageIcon className="h-3 w-3" />
+                              </div>
                             )}
-                            <span className="font-semibold text-foreground">
+                            <span className="font-semibold text-foreground text-[11px]">
                               {a.check_in_time || "-"}
                             </span>
                           </div>
                         </td>
 
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2.5">
-                            {a.check_out_photo && (
+                        <td className="px-6 py-3.5">
+                          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/80">
+                            {a.check_out_photo ? (
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img
                                 src={a.check_out_photo}
                                 alt="Foto Pulang"
+                                title="Klik untuk memperbesar"
                                 onClick={() => setPreviewPhoto(a.check_out_photo || null)}
-                                className="h-9 w-9 rounded-lg object-cover border border-border cursor-pointer hover:opacity-80"
+                                className="h-6 w-6 rounded-md object-cover border border-border cursor-pointer hover:scale-110 transition-transform shadow-2xs shrink-0"
                               />
+                            ) : (
+                              <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground/60 shrink-0">
+                                <ImageIcon className="h-3 w-3" />
+                              </div>
                             )}
-                            <span className="font-semibold text-foreground">
+                            <span className="font-semibold text-foreground text-[11px]">
                               {a.check_out_time || "-"}
                             </span>
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 text-muted-foreground">
+                        <td className="px-6 py-3.5 text-muted-foreground">
                           {a.notes || "-"}
                         </td>
                       </tr>

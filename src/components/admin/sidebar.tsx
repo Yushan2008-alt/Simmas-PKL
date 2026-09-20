@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Activity,
@@ -11,13 +11,9 @@ import {
   Briefcase,
   Settings,
   ScrollText,
-  LogOut,
   ChevronRight,
-  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { logoutUser } from "@/lib/supabase/services";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -26,7 +22,6 @@ interface SidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const menuGroups = [
     {
@@ -38,7 +33,7 @@ export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           icon: LayoutDashboard,
         },
         {
-          title: "Monitoring Global",
+          title: "Monitoring Realtime",
           href: "/admin/monitoring",
           icon: Activity,
         },
@@ -48,67 +43,55 @@ export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
       groupLabel: "MASTER DATA",
       items: [
         {
-          title: "Data Guru",
-          href: "/admin/guru",
+          title: "Data Siswa",
+          href: "/admin/siswa",
           icon: GraduationCap,
         },
         {
-          title: "Data Siswa",
-          href: "/admin/siswa",
+          title: "Data Guru Pembimbing",
+          href: "/admin/guru",
           icon: Users,
         },
         {
-          title: "Data DUDI",
+          title: "Mitra DUDI",
           href: "/admin/dudi",
           icon: Building2,
         },
       ],
     },
     {
-      groupLabel: "MANAJEMEN",
+      groupLabel: "MANAJEMEN & SISTEM",
       items: [
         {
           title: "Penempatan Magang",
           href: "/admin/penempatan",
           icon: Briefcase,
         },
-      ],
-    },
-    {
-      groupLabel: "SISTEM",
-      items: [
         {
-          title: "Pengaturan Sistem",
-          href: "/admin/settings",
-          icon: Settings,
-        },
-        {
-          title: "Log Aktivitas",
+          title: "Log Audit Sistem",
           href: "/admin/logs",
           icon: ScrollText,
+        },
+        {
+          title: "Pengaturan SIMMAS",
+          href: "/admin/settings",
+          icon: Settings,
         },
       ],
     },
   ];
-
-  const handleLogout = () => {
-    logoutUser();
-    toast.success("Berhasil keluar", {
-      description: "Anda telah keluar dari sesi Admin SIMMAS.",
-    });
-    router.push("/login");
-  };
 
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-xs transition-opacity"
+          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-xs lg:hidden"
           onClick={onClose}
         />
       )}
 
+      {/* Sidebar Container */}
       <aside
         className={cn(
           "fixed top-0 bottom-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0",
@@ -118,7 +101,7 @@ export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-sm text-white font-bold">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm text-primary-foreground font-bold">
               <GraduationCap className="h-5 w-5" />
             </div>
             <div className="flex items-center gap-1.5">
@@ -126,7 +109,7 @@ export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
                 SIMMAS
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">
-                v2.0
+                ADMIN
               </span>
             </div>
           </Link>
@@ -174,28 +157,6 @@ export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
               })}
             </div>
           ))}
-        </div>
-
-        {/* Bottom Profile & Logout Footer */}
-        <div className="border-t border-border p-4 bg-muted/20">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-background border border-border shadow-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <Shield className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-foreground truncate">Administrator</p>
-                <p className="text-[10px] text-muted-foreground truncate">admin@simmas.sch.id</p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              title="Keluar"
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       </aside>
     </>

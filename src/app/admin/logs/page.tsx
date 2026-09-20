@@ -85,15 +85,15 @@ export default function AuditLogsPage() {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-center gap-3 bg-card p-4 rounded-2xl border border-border">
-        <div className="relative flex-1 w-full">
+      {/* Filters: Shortened search input directly beside the level filter */}
+      <div className="flex flex-wrap items-center gap-3 bg-card p-4 rounded-2xl border border-border">
+        <div className="relative w-full sm:w-72">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Cari aksi, target, atau aktor log..."
+            placeholder="Cari aksi, target, aktor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 h-10 bg-muted/20 text-xs sm:text-sm"
+            className="pl-10 h-10 bg-muted/20 text-xs sm:text-sm w-full"
           />
         </div>
         <div className="w-full sm:w-auto">

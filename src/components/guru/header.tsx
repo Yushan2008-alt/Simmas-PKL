@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Menu, ExternalLink, Radio, ShieldCheck } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, ExternalLink, Radio, ShieldCheck, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getActiveGuru } from "@/lib/supabase/services";
+import { getActiveGuru, getDefaultGuru, logoutUser } from "@/lib/supabase/services";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   onOpenMobileMenu?: () => void;
@@ -20,8 +22,11 @@ const pageTitles: Record<string, { title: string; category: string }> = {
 
 export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const current = pageTitles[pathname] || { title: "Portal Guru", category: "SIMMAS" };
-  const [guru, setGuru] = React.useState(getActiveGuru());
+  const [guru, setGuru] = React.useState(() => getActiveGuru());
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setGuru(getActiveGuru());
@@ -32,6 +37,26 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
       return () => window.removeEventListener("simmas_auth_changed", handleAuthChange);
     }
   }, []);
+
+  // Close dropdown on click outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    setDropdownOpen(false);
+    logoutUser();
+    toast.success("Berhasil keluar", {
+      description: "Anda telah keluar dari sesi Guru SIMMAS.",
+    });
+    router.push("/login");
+  };
 
   const guruInitials =
     (guru.name || "Guru")
@@ -46,7 +71,7 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
       .toUpperCase() || "GP";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-background/90 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-background/90 px-4 sm:px-6 backdrop-blur-md">
       {/* Left: Mobile Toggle & Breadcrumb */}
       <div className="flex items-center gap-3">
         <button
@@ -70,40 +95,114 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
       </div>
 
       {/* Right Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         {/* Realtime Status Pill */}
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
           <Radio className="h-2.5 w-2.5 animate-pulse text-emerald-500" />
           <span>REAL-TIME AKTIF</span>
         </div>
 
-        {/* Teacher Identity Badge */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-muted/30">
-          <div className="h-7 w-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold text-xs">
-            {guruInitials}
-          </div>
-          <div className="text-left">
-            <p className="text-xs font-bold text-foreground leading-none">
-              {guru.name}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              NIP: {guru.nip}
-            </p>
-          </div>
-        </div>
-
         {/* View Landing */}
-        <Button
-          variant="outline"
-          size="sm"
-          asChild
-          className="h-9 gap-1.5 text-xs font-semibold rounded-xl"
+        <Link
+          href="/"
+          target="_blank"
+          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
         >
-          <Link href="/" target="_blank">
-            <ExternalLink className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Lihat Web</span>
-          </Link>
-        </Button>
+          <ExternalLink className="h-3.5 w-3.5" />
+          <span>Lihat Web</span>
+        </Link>
+
+        {/* Interactive Teacher Account Badge & Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen((prev) => !prev)}
+            className={cn(
+              "flex items-center gap-2.5 p-1.5 pr-2.5 sm:pr-3 rounded-2xl border border-border bg-card hover:bg-muted/60 transition-all text-left group shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/20",
+              dropdownOpen && "bg-muted/70 ring-2 ring-primary/20 border-primary/40"
+            )}
+            aria-expanded={dropdownOpen}
+            aria-label="Menu Akun Guru"
+          >
+            <div
+              suppressHydrationWarning
+              className="h-8 w-8 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs"
+            >
+              {guruInitials}
+            </div>
+
+            <div className="hidden md:block text-left min-w-0 max-w-[150px]">
+              <p suppressHydrationWarning className="text-xs font-bold text-foreground leading-tight truncate">
+                {guru.name}
+              </p>
+              <p suppressHydrationWarning className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
+                NIP: {guru.nip}
+              </p>
+            </div>
+
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                dropdownOpen && "rotate-180 text-foreground"
+              )}
+            />
+          </button>
+
+          {/* Dropdown Menu Popover */}
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-border bg-card p-3 shadow-xl z-50 animate-in fade-in-0 zoom-in-95 duration-150">
+              {/* Account Profile Details */}
+              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-muted/40 mb-2">
+                <div
+                  suppressHydrationWarning
+                  className="h-10 w-10 rounded-xl bg-blue-600/15 text-blue-600 flex items-center justify-center font-extrabold text-sm shrink-0"
+                >
+                  {guruInitials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p suppressHydrationWarning className="text-xs font-extrabold text-foreground truncate">
+                    {guru.name}
+                  </p>
+                  <p suppressHydrationWarning className="text-[11px] text-muted-foreground truncate mt-0.5">
+                    {guru.email}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                      <ShieldCheck className="h-3 w-3 text-blue-600" />
+                      Guru Pembimbing
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Department & NIP Information */}
+              <div className="space-y-1.5 px-2 py-1.5 text-xs text-muted-foreground border-b border-border/60 pb-2 mb-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium">NIP</span>
+                  <span suppressHydrationWarning className="text-[11px] font-bold text-foreground font-mono">
+                    {guru.nip}
+                  </span>
+                </div>
+                {guru.department && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium">Departemen</span>
+                    <span suppressHydrationWarning className="text-[11px] font-bold text-foreground truncate max-w-[150px]">
+                      {guru.department}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-500/10 rounded-xl transition-colors mt-1"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Keluar Sesi</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

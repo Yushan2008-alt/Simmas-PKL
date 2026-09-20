@@ -19,16 +19,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   getActiveGuru,
+  getDefaultGuru,
   getKunjunganList,
   updateKunjungan,
   deleteKunjungan,
   getSupervisedStudentsSummary,
 } from "@/lib/supabase/services";
-import { Kunjungan, Dudi } from "@/types/database";
+import { Guru, Kunjungan, Dudi } from "@/types/database";
 import { TambahKunjunganModal } from "@/components/guru/tambah-kunjungan-modal";
 
 export default function GuruKunjunganPage() {
-  const guru = getActiveGuru();
+  const [guru, setGuru] = React.useState<Guru>(() => getActiveGuru());
   const [kunjunganList, setKunjunganList] = React.useState<Kunjungan[]>([]);
   const [availableDudis, setAvailableDudis] = React.useState<Dudi[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -37,10 +38,17 @@ export default function GuruKunjunganPage() {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   const loadData = React.useCallback(async () => {
+    const currentGuru = getActiveGuru();
+    setGuru(currentGuru);
+    if (!currentGuru || !currentGuru.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const [kList, sumList] = await Promise.all([
-        getKunjunganList(guru.id),
-        getSupervisedStudentsSummary(guru.id),
+        getKunjunganList(currentGuru.id),
+        getSupervisedStudentsSummary(currentGuru.id),
       ]);
       setKunjunganList(kList);
 
@@ -53,16 +61,23 @@ export default function GuruKunjunganPage() {
     } finally {
       setLoading(false);
     }
-  }, [guru.id]);
+  }, []);
 
   React.useEffect(() => {
     loadData();
 
+    const handleAuthChange = () => loadData();
     const handleUpdate = () => loadData();
+    const handlePenempatanUpdate = () => loadData();
+
     if (typeof window !== "undefined") {
+      window.addEventListener("simmas_auth_changed", handleAuthChange);
       window.addEventListener("simmas_kunjungan_updated", handleUpdate);
+      window.addEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       return () => {
+        window.removeEventListener("simmas_auth_changed", handleAuthChange);
         window.removeEventListener("simmas_kunjungan_updated", handleUpdate);
+        window.removeEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       };
     }
   }, [loadData]);
@@ -116,7 +131,7 @@ export default function GuruKunjunganPage() {
   const selesaiCount = kunjunganList.filter((k) => k.status === "Selesai").length;
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
@@ -188,31 +203,31 @@ export default function GuruKunjunganPage() {
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-72">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Cari DUDI atau isi catatan kunjungan..."
+            placeholder="Cari DUDI atau catatan..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-11 rounded-xl bg-card"
+            className="pl-9 h-10 rounded-xl bg-card text-xs"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setStatusFilter("ALL")}
-            className={`px-3.5 h-11 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               statusFilter === "ALL"
                 ? "bg-primary text-primary-foreground shadow-xs"
                 : "bg-card text-muted-foreground border border-border hover:bg-muted"
             }`}
           >
-            Semua
+            Semua ({kunjunganList.length})
           </button>
           <button
             onClick={() => setStatusFilter("Terjadwal")}
-            className={`px-3.5 h-11 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               statusFilter === "Terjadwal"
                 ? "bg-blue-600 text-white shadow-xs"
                 : "bg-card text-blue-600 border border-border hover:bg-blue-50"
@@ -222,7 +237,7 @@ export default function GuruKunjunganPage() {
           </button>
           <button
             onClick={() => setStatusFilter("Selesai")}
-            className={`px-3.5 h-11 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               statusFilter === "Selesai"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-card text-emerald-600 border border-border hover:bg-emerald-50"
