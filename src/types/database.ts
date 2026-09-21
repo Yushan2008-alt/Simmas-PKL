@@ -60,6 +60,7 @@ export interface Penempatan {
 
 export type AbsensiStatus = "Hadir" | "Sakit" | "Izin" | "Alfa";
 export type AbsensiValidationStatus = "Menunggu" | "Disetujui" | "Perlu Revisi" | "Ditolak";
+export type AbsensiValidationTarget = "DATANG" | "PULANG" | "SEMUA";
 
 export interface Absensi {
   id: string;
@@ -72,6 +73,7 @@ export interface Absensi {
   check_out_photo?: string;
   notes?: string;
   validation_status?: AbsensiValidationStatus;
+  validation_target?: AbsensiValidationTarget;
   validation_notes?: string;
   validated_at?: string;
   created_at: string;

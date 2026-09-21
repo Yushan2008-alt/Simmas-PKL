@@ -5,7 +5,7 @@ import { X, CheckCircle2, XCircle, Clock, Calendar, User, FileText, AlertCircle 
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Absensi, AbsensiValidationStatus } from "@/types/database";
+import { Absensi, AbsensiValidationStatus, AbsensiValidationTarget } from "@/types/database";
 import { validateAbsensi } from "@/lib/supabase/services";
 
 interface ValidasiAbsensiModalProps {
@@ -22,6 +22,7 @@ export function ValidasiAbsensiModal({
   absensi,
 }: ValidasiAbsensiModalProps) {
   const [status, setStatus] = React.useState<"Disetujui" | "Perlu Revisi">("Disetujui");
+  const [target, setTarget] = React.useState<AbsensiValidationTarget>("DATANG");
   const [notes, setNotes] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -30,8 +31,10 @@ export function ValidasiAbsensiModal({
     if (isOpen && absensi) {
       if (absensi.validation_status === "Perlu Revisi" || absensi.validation_status === "Ditolak") {
         setStatus("Perlu Revisi");
+        setTarget(absensi.validation_target || (absensi.check_out_time ? "SEMUA" : "DATANG"));
       } else {
         setStatus("Disetujui");
+        setTarget(absensi.check_out_time ? "SEMUA" : "DATANG");
       }
       setNotes(absensi.validation_notes || "");
       setError(null);
@@ -50,7 +53,12 @@ export function ValidasiAbsensiModal({
 
     setIsSubmitting(true);
     try {
-      await validateAbsensi(absensi.id, status, notes.trim() || undefined);
+      await validateAbsensi(
+        absensi.id,
+        status,
+        notes.trim() || undefined,
+        status === "Perlu Revisi" ? target : undefined
+      );
       toast.success(
         status === "Disetujui"
           ? "Presensi Berhasil Disetujui!"
@@ -59,7 +67,7 @@ export function ValidasiAbsensiModal({
           description:
             status === "Disetujui"
               ? `Presensi ${absensi.student?.name || "siswa"} ditandai sebagai 'Disetujui'.`
-              : `Status presensi diubah menjadi 'Perlu Revisi'. Siswa dapat mengambil ulang foto presensi.`,
+              : `Status presensi diubah menjadi 'Perlu Revisi (${target === "DATANG" ? "Masuk" : target === "PULANG" ? "Pulang" : "Semua"})'.`,
         }
       );
       onSuccess();
@@ -168,6 +176,68 @@ export function ValidasiAbsensiModal({
               </button>
             </div>
           </div>
+
+          {/* Target Bagian yang Memerlukan Revisi (Hanya jika status Perlu Revisi) */}
+          {status === "Perlu Revisi" && (
+            <div className="space-y-2 p-3.5 rounded-xl bg-amber-500/10 border border-amber-300 dark:border-amber-900/60 animate-in fade-in-50 duration-150">
+              <label className="text-xs font-bold text-amber-900 dark:text-amber-300 block">
+                Bagian yang Memerlukan Revisi <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-1.5 text-xs">
+                <label className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-amber-100/50 dark:hover:bg-amber-950/40 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name="validation_target"
+                    checked={target === "DATANG"}
+                    onChange={() => setTarget("DATANG")}
+                    className="accent-amber-600 h-3.5 w-3.5"
+                  />
+                  <div className="flex-1">
+                    <span className="font-bold text-foreground">Presensi Datang / Masuk Saja</span>
+                    <p className="text-[11px] text-muted-foreground">Presensi pulang siswa tetap valid dan aman.</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-2.5 p-2 rounded-lg transition-colors ${
+                  !absensi.check_out_time ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-100/50 dark:hover:bg-amber-950/40 cursor-pointer"
+                }`}>
+                  <input
+                    type="radio"
+                    name="validation_target"
+                    disabled={!absensi.check_out_time}
+                    checked={target === "PULANG"}
+                    onChange={() => setTarget("PULANG")}
+                    className="accent-amber-600 h-3.5 w-3.5"
+                  />
+                  <div className="flex-1">
+                    <span className="font-bold text-foreground">Presensi Pulang Saja</span>
+                    <p className="text-[11px] text-muted-foreground">
+                      {absensi.check_out_time
+                        ? "Presensi datang siswa tetap valid dan aman."
+                        : "Siswa belum melakukan presensi pulang hari ini."}
+                    </p>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-2.5 p-2 rounded-lg transition-colors ${
+                  !absensi.check_out_time ? "opacity-50 cursor-not-allowed" : "hover:bg-amber-100/50 dark:hover:bg-amber-950/40 cursor-pointer"
+                }`}>
+                  <input
+                    type="radio"
+                    name="validation_target"
+                    disabled={!absensi.check_out_time}
+                    checked={target === "SEMUA"}
+                    onChange={() => setTarget("SEMUA")}
+                    className="accent-amber-600 h-3.5 w-3.5"
+                  />
+                  <div className="flex-1">
+                    <span className="font-bold text-foreground">Kedua Presensi (Datang & Pulang)</span>
+                    <p className="text-[11px] text-muted-foreground">Siswa diminta mengambil ulang foto masuk dan pulang.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
 
           {/* Catatan / Keterangan Evaluasi */}
           <div className="space-y-1.5">

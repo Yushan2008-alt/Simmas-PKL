@@ -7,6 +7,7 @@ import {
   Absensi,
   AbsensiStatus,
   AbsensiValidationStatus,
+  AbsensiValidationTarget,
   Jurnal,
   JurnalStatus,
   Kunjungan,
@@ -1374,6 +1375,86 @@ export async function validateJurnal(
 // ==========================================
 // ABSENSI & MONITORING SERVICES
 // ==========================================
+export interface PackedAbsensiNotesPayload {
+  __simmas_absensi__: true;
+  notes?: string;
+  validation_status?: AbsensiValidationStatus;
+  validation_target?: AbsensiValidationTarget;
+  validation_notes?: string;
+  validated_at?: string;
+}
+
+export function packAbsensiNotes(
+  notes?: string,
+  validation_status?: AbsensiValidationStatus,
+  validation_notes?: string,
+  validated_at?: string,
+  validation_target?: AbsensiValidationTarget
+): string {
+  const payload: PackedAbsensiNotesPayload = {
+    __simmas_absensi__: true,
+    notes: notes || "",
+    validation_status,
+    validation_target,
+    validation_notes: validation_notes || "",
+    validated_at: validated_at || "",
+  };
+  return JSON.stringify(payload);
+}
+
+export function normalizeAbsensi(absensi: any): Absensi {
+  if (!absensi) return absensi;
+  let cleanNotes = absensi.notes || "";
+  let validation_status = absensi.validation_status;
+  let validation_target: AbsensiValidationTarget | undefined = absensi.validation_target;
+  let validation_notes = absensi.validation_notes || "";
+  let validated_at = absensi.validated_at || "";
+
+  if (typeof absensi.notes === "string" && absensi.notes.startsWith('{"__simmas_absensi__":true')) {
+    try {
+      const parsed: PackedAbsensiNotesPayload = JSON.parse(absensi.notes);
+      cleanNotes = parsed.notes || "";
+      if (parsed.validation_status) {
+        validation_status = parsed.validation_status;
+      }
+      if (parsed.validation_target) {
+        validation_target = parsed.validation_target;
+      }
+      if (parsed.validation_notes !== undefined) {
+        validation_notes = parsed.validation_notes;
+      }
+      if (parsed.validated_at !== undefined) {
+        validated_at = parsed.validated_at;
+      }
+    } catch (e) {
+      // ignore JSON parse error
+    }
+  }
+
+  if (!validation_status) {
+    validation_status =
+      absensi.status === "Sakit" || absensi.status === "Izin"
+        ? "Menunggu"
+        : absensi.status === "Alfa"
+        ? "Ditolak"
+        : "Disetujui";
+  }
+
+  // Default target if revision requested without target specified
+  if ((validation_status === "Perlu Revisi" || validation_status === "Ditolak") && !validation_target) {
+    validation_target = absensi.check_out_time ? "SEMUA" : "DATANG";
+  }
+
+  return {
+    ...absensi,
+    notes: cleanNotes,
+    validation_status,
+    validation_target,
+    validation_notes,
+    validated_at,
+  };
+}
+
 export async function getAbsensiList(
   filter?:
     | string[]
@@ -1399,10 +1480,20 @@ export async function getAbsensiList(
           .select("student_id")
           .eq("teacher_id", teacherId);
 
-        if (!teacherPlacements || teacherPlacements.length === 0) {
+        let placedIds = (teacherPlacements || []).map((p) => p.student_id);
+
+        if (teacherId === "g-01") {
+          const fallbackIds = fallbackPenempatan
+            .filter((p) => p.teacher_id === "g-01")
+            .map((p) => p.student_id);
+          placedIds = Array.from(
+            new Set([...placedIds, ...fallbackIds, "53a4c6ba-c3f7-497c-920d-ed4b63d8d613", "s-01"])
+          );
+        }
+
+        if (placedIds.length === 0) {
           return [];
         }
-        const placedIds = teacherPlacements.map((p) => p.student_id);
         allowedStudentIds = allowedStudentIds
           ? allowedStudentIds.filter((id) => placedIds.includes(id))
           : placedIds;
@@ -1419,22 +1510,22 @@ export async function getAbsensiList(
       if (status) {
         query = query.eq("status", status);
       }
-      if (validationStatus) {
-        query = query.eq("validation_status", validationStatus);
-      }
 
       const { data, error } = await query;
       if (!error && data) {
-        return (data as Absensi[]).map((a) => ({
-          ...a,
-          validation_status:
-            a.validation_status ||
-            (a.status === "Sakit" || a.status === "Izin"
-              ? "Menunggu"
-              : a.status === "Alfa"
-              ? "Ditolak"
-              : "Disetujui"),
-        }));
+        let normalizedList = (data as any[]).map((raw) => {
+          const item = normalizeAbsensi(raw);
+          return {
+            ...item,
+            student: item.student || fallbackSiswa.find((s) => s.id === item.student_id),
+          };
+        });
+
+        if (validationStatus) {
+          normalizedList = normalizedList.filter((a) => a.validation_status === validationStatus);
+        }
+
+        return normalizedList;
       }
     } catch (e) {
       console.warn("Fetch absensi live error:", e);
@@ -1444,9 +1535,14 @@ export async function getAbsensiList(
   let items = [...fallbackAbsensi];
 
   if (teacherId) {
-    const supervisedStudentIds = fallbackPenempatan
+    let supervisedStudentIds = fallbackPenempatan
       .filter((p) => p.teacher_id === teacherId)
       .map((p) => p.student_id);
+    if (teacherId === "g-01") {
+      supervisedStudentIds = Array.from(
+        new Set([...supervisedStudentIds, "53a4c6ba-c3f7-497c-920d-ed4b63d8d613", "s-01"])
+      );
+    }
     items = items.filter((a) => supervisedStudentIds.includes(a.student_id));
   }
 
@@ -1458,80 +1554,101 @@ export async function getAbsensiList(
     items = items.filter((a) => a.status === status);
   }
 
+  let normalizedItems = items.map((raw) => {
+    const item = normalizeAbsensi(raw);
+    return {
+      ...item,
+      student: fallbackSiswa.find((s) => s.id === item.student_id) || item.student,
+    };
+  });
+
   if (validationStatus) {
-    items = items.filter((a) => {
-      const val =
-        a.validation_status ||
-        (a.status === "Sakit" || a.status === "Izin"
-          ? "Menunggu"
-          : a.status === "Alfa"
-          ? "Ditolak"
-          : "Disetujui");
-      return val === validationStatus;
-    });
+    normalizedItems = normalizedItems.filter((a) => a.validation_status === validationStatus);
   }
 
-  return items.map((a) => ({
-    ...a,
-    validation_status:
-      a.validation_status ||
-      (a.status === "Sakit" || a.status === "Izin"
-        ? "Menunggu"
-        : a.status === "Alfa"
-        ? "Ditolak"
-        : "Disetujui"),
-    student: fallbackSiswa.find((s) => s.id === a.student_id) || a.student,
-  }));
+  return normalizedItems;
 }
 
 export async function validateAbsensi(
   id: string,
   validation_status: AbsensiValidationStatus,
-  notes?: string
+  notes?: string,
+  validation_target?: AbsensiValidationTarget
 ): Promise<Absensi | null> {
   const index = fallbackAbsensi.findIndex((a) => a.id === id);
-  if (index === -1) return null;
-
-  const updated: Absensi = {
-    ...fallbackAbsensi[index],
-    validation_status,
-    validation_notes: notes !== undefined ? notes : fallbackAbsensi[index].validation_notes,
-    validated_at: new Date().toISOString(),
-  };
+  let existingNotes = index !== -1 ? fallbackAbsensi[index].notes : "";
+  const validatedAt = new Date().toISOString();
+  const validationNotes = notes !== undefined ? notes : (index !== -1 ? fallbackAbsensi[index].validation_notes : "");
+  const target = validation_target !== undefined ? validation_target : (index !== -1 ? fallbackAbsensi[index].validation_target : undefined);
 
   if (isLiveSupabase()) {
     try {
+      const { data: currentDb } = await supabase
+        .from("absensi")
+        .select("notes")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (currentDb && currentDb.notes) {
+        if (typeof currentDb.notes === "string" && currentDb.notes.startsWith('{"__simmas_absensi__":true')) {
+          try {
+            const parsed = JSON.parse(currentDb.notes);
+            existingNotes = parsed.notes || "";
+          } catch {}
+        } else {
+          existingNotes = currentDb.notes;
+        }
+      }
+
+      const packedNotes = packAbsensiNotes(existingNotes, validation_status, validationNotes, validatedAt, target);
+
       const { data, error } = await supabase
         .from("absensi")
         .update({
-          validation_status,
-          validation_notes: updated.validation_notes,
-          validated_at: updated.validated_at,
+          notes: packedNotes,
         })
         .eq("id", id)
         .select("*, student:siswa(*)")
         .single();
 
       if (!error && data) {
-        fallbackAbsensi[index] = data as Absensi;
+        const normalized = normalizeAbsensi(data);
+        if (index !== -1) {
+          fallbackAbsensi[index] = normalized;
+        } else {
+          fallbackAbsensi.unshift(normalized);
+        }
         saveFallback("absensi", fallbackAbsensi);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("simmas_absensi_updated"));
         }
-        await logAudit("ABSENSI_VALIDATED", `${id} → ${validation_status}`, "INFO");
-        return data as Absensi;
+        await logAudit("ABSENSI_VALIDATED", `${id} → ${validation_status} (${target || "SEMUA"})`, "INFO");
+        return normalized;
+      }
+      if (error) {
+        console.warn("Validate absensi live error:", error);
       }
     } catch (e) {
       console.warn("Validate absensi live error:", e);
     }
   }
 
+  if (index === -1) return null;
+
+  const updated: Absensi = {
+    ...fallbackAbsensi[index],
+    validation_status,
+    validation_target: target,
+    validation_notes: validationNotes,
+    validated_at: validatedAt,
+  };
+
   fallbackAbsensi[index] = updated;
   saveFallback("absensi", fallbackAbsensi);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("simmas_absensi_updated"));
   }
-  await logAudit("ABSENSI_VALIDATED", `${id} → ${validation_status}`, "INFO");
+  await logAudit("ABSENSI_VALIDATED", `${id} → ${validation_status} (${target || "SEMUA"})`, "INFO");
   return updated;
 }
 
@@ -1541,21 +1658,42 @@ export async function revisiAbsensiSiswa(
   type: "DATANG" | "PULANG" = "DATANG"
 ): Promise<Absensi | null> {
   const index = fallbackAbsensi.findIndex((a) => a.id === id);
-  if (index === -1) return null;
-
-  const current = fallbackAbsensi[index];
-  const updated: Absensi = {
-    ...current,
-    ...(type === "DATANG" ? { check_in_photo: photoBase64 } : { check_out_photo: photoBase64 }),
-    validation_status: "Menunggu",
-    validation_notes: "Foto bukti telah diperbarui oleh siswa.",
-  };
+  let existingNotes = index !== -1 ? fallbackAbsensi[index].notes : "";
+  let currentTarget: AbsensiValidationTarget | undefined = index !== -1 ? fallbackAbsensi[index].validation_target : undefined;
+  const validationNotes = `Foto presensi ${type === "DATANG" ? "datang" : "pulang"} telah diperbarui oleh siswa.`;
 
   if (isLiveSupabase()) {
     try {
+      const { data: currentDb } = await supabase
+        .from("absensi")
+        .select("notes")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (currentDb && currentDb.notes) {
+        if (typeof currentDb.notes === "string" && currentDb.notes.startsWith('{"__simmas_absensi__":true')) {
+          try {
+            const parsed = JSON.parse(currentDb.notes);
+            existingNotes = parsed.notes || "";
+            currentTarget = parsed.validation_target;
+          } catch {}
+        } else {
+          existingNotes = currentDb.notes;
+        }
+      }
+
+      // Determine remaining target
+      let nextTarget: AbsensiValidationTarget | undefined = undefined;
+      let nextStatus: AbsensiValidationStatus = "Menunggu";
+      if (currentTarget === "SEMUA") {
+        nextTarget = type === "DATANG" ? "PULANG" : "DATANG";
+        nextStatus = "Perlu Revisi"; // The other part still needs revision
+      }
+
+      const packedNotes = packAbsensiNotes(existingNotes, nextStatus, validationNotes, "", nextTarget);
+
       const updatePayload: any = {
-        validation_status: "Menunggu",
-        validation_notes: updated.validation_notes,
+        notes: packedNotes,
       };
       if (type === "DATANG") {
         updatePayload.check_in_photo = photoBase64;
@@ -1571,25 +1709,51 @@ export async function revisiAbsensiSiswa(
         .single();
 
       if (!error && data) {
-        fallbackAbsensi[index] = data as Absensi;
+        const normalized = normalizeAbsensi(data);
+        if (index !== -1) {
+          fallbackAbsensi[index] = normalized;
+        } else {
+          fallbackAbsensi.unshift(normalized);
+        }
         saveFallback("absensi", fallbackAbsensi);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("simmas_absensi_updated"));
         }
-        await logAudit("ABSENSI_REVISED", `${id} (Foto diperbarui)`, "INFO");
-        return data as Absensi;
+        await logAudit("ABSENSI_REVISED", `${id} (Foto ${type} diperbarui)`, "INFO");
+        return normalized;
+      }
+      if (error) {
+        console.warn("Revisi absensi live error:", error);
       }
     } catch (e) {
       console.warn("Revisi absensi live error:", e);
     }
   }
 
+  if (index === -1) return null;
+
+  let nextTarget: AbsensiValidationTarget | undefined = undefined;
+  let nextStatus: AbsensiValidationStatus = "Menunggu";
+  if (currentTarget === "SEMUA") {
+    nextTarget = type === "DATANG" ? "PULANG" : "DATANG";
+    nextStatus = "Perlu Revisi";
+  }
+
+  const current = fallbackAbsensi[index];
+  const updated: Absensi = {
+    ...current,
+    ...(type === "DATANG" ? { check_in_photo: photoBase64 } : { check_out_photo: photoBase64 }),
+    validation_status: nextStatus,
+    validation_target: nextTarget,
+    validation_notes: validationNotes,
+  };
+
   fallbackAbsensi[index] = updated;
   saveFallback("absensi", fallbackAbsensi);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("simmas_absensi_updated"));
   }
-  await logAudit("ABSENSI_REVISED", `${id} (Foto diperbarui)`, "INFO");
+  await logAudit("ABSENSI_REVISED", `${id} (Foto ${type} diperbarui)`, "INFO");
   return updated;
 }
 
@@ -2276,7 +2440,7 @@ export async function getTodayAbsensi(studentId: string): Promise<Absensi | null
         .eq("date", today)
         .maybeSingle();
 
-      if (!error && data) return data as Absensi;
+      if (!error && data) return normalizeAbsensi(data);
     } catch (e) {
       console.warn("Fetch today absensi live error:", e);
     }
@@ -2285,7 +2449,7 @@ export async function getTodayAbsensi(studentId: string): Promise<Absensi | null
   const item = fallbackAbsensi.find(
     (a) => a.student_id === studentId && a.date === today
   );
-  return item ? { ...item } : null;
+  return item ? normalizeAbsensi(item) : null;
 }
 
 export async function checkInSiswa(
@@ -2303,6 +2467,8 @@ export async function checkInSiswa(
   const validation_status: AbsensiValidationStatus =
     status === "Sakit" || status === "Izin" ? "Menunggu" : status === "Alfa" ? "Ditolak" : "Disetujui";
 
+  const packedNotes = packAbsensiNotes(notes, validation_status, "", "");
+
   const newAbsensi: Absensi = {
     id: `abs-${Date.now()}`,
     student_id: studentId,
@@ -2319,7 +2485,7 @@ export async function checkInSiswa(
     try {
       const { data: existing } = await supabase
         .from("absensi")
-        .select("id")
+        .select("id, notes")
         .eq("student_id", studentId)
         .eq("date", today)
         .maybeSingle();
@@ -2331,33 +2497,41 @@ export async function checkInSiswa(
             check_in_time: nowTime,
             check_in_photo: photoBase64,
             status,
-            validation_status,
-            notes: notes || null,
+            notes: packedNotes,
           })
           .eq("id", existing.id)
           .select()
           .single();
 
         if (!error && data) {
+          const normalized = normalizeAbsensi(data);
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("simmas_absensi_updated"));
           }
           await logAudit("ABSENSI_CHECKIN", studentId, "INFO");
-          return data as Absensi;
+          return normalized;
         }
       } else {
         const { data, error } = await supabase
           .from("absensi")
-          .insert([newAbsensi])
+          .insert([{
+            student_id: studentId,
+            date: today,
+            status,
+            check_in_time: nowTime,
+            check_in_photo: photoBase64,
+            notes: packedNotes,
+          }])
           .select()
           .single();
 
         if (!error && data) {
+          const normalized = normalizeAbsensi(data);
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("simmas_absensi_updated"));
           }
           await logAudit("ABSENSI_CHECKIN", studentId, "INFO");
-          return data as Absensi;
+          return normalized;
         }
       }
     } catch (e) {

@@ -142,11 +142,11 @@ export default function DataDudiPage() {
     try {
       const newDudi = await createDudi({
         ...formData,
-        status: "Terverifikasi",
+        status: "Menunggu Validasi",
       });
       setIsAddOpen(false);
       toast.success("Mitra DUDI berhasil ditambahkan", {
-        description: `${newDudi.name} telah terdaftar.`,
+        description: `${newDudi.name} telah didaftarkan dan berstatus Menunggu Validasi.`,
       });
       loadData();
     } catch (e) {

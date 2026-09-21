@@ -145,6 +145,19 @@ export default function SiswaDashboardPage() {
     }
   };
 
+  const isDatangNeedRevision =
+    (todayAbsensi?.validation_status === "Perlu Revisi" ||
+      todayAbsensi?.validation_status === "Ditolak") &&
+    (!todayAbsensi?.validation_target ||
+      todayAbsensi?.validation_target === "DATANG" ||
+      todayAbsensi?.validation_target === "SEMUA");
+
+  const isPulangNeedRevision =
+    (todayAbsensi?.validation_status === "Perlu Revisi" ||
+      todayAbsensi?.validation_status === "Ditolak") &&
+    (todayAbsensi?.validation_target === "PULANG" ||
+      todayAbsensi?.validation_target === "SEMUA");
+
   const isBelumMagang = siswa.status === "Belum Magang" || !placement;
 
   return (
@@ -266,13 +279,26 @@ export default function SiswaDashboardPage() {
                   >
                     {todayAbsensi?.validation_status === "Perlu Revisi" ||
                     todayAbsensi?.validation_status === "Ditolak"
-                      ? "Foto Perlu Revisi"
+                      ? todayAbsensi.validation_target === "PULANG"
+                        ? "Foto Pulang Perlu Revisi"
+                        : todayAbsensi.validation_target === "DATANG"
+                        ? "Foto Masuk Perlu Revisi"
+                        : "Foto Masuk & Pulang Perlu Revisi"
                       : todayAbsensi?.check_in_time
                       ? `Masuk: ${todayAbsensi.check_in_time}`
                       : "Belum Presensi Datang"}
                   </span>
                   {todayAbsensi?.check_out_time && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                        (todayAbsensi?.validation_status === "Perlu Revisi" ||
+                          todayAbsensi?.validation_status === "Ditolak") &&
+                        (todayAbsensi.validation_target === "PULANG" ||
+                          todayAbsensi.validation_target === "SEMUA")
+                          ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-300"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
                       Pulang: {todayAbsensi.check_out_time}
                     </span>
                   )}
@@ -283,92 +309,104 @@ export default function SiswaDashboardPage() {
 
           {/* Quick Action Presensi & Jurnal */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {/* Presensi Datang Card */}
-            <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-full">
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600">
-                    <Camera className="h-5 w-5" />
+                {/* Presensi Datang Card */}
+                <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-full">
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600">
+                        <Camera className="h-5 w-5" />
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                        Presensi Pagi
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">Presensi Datang</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        {isDatangNeedRevision
+                          ? todayAbsensi?.validation_notes
+                            ? `Catatan Guru: "${todayAbsensi.validation_notes}"`
+                            : "Foto selfie masuk ditolak/kurang jelas, silakan ambil foto selfie ulang."
+                          : todayAbsensi?.check_in_time
+                          ? `Sudah presensi jam ${todayAbsensi.check_in_time}`
+                          : "Wajib live camera selfie saat tiba di kantor"}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                    Presensi Pagi
-                  </span>
+                  <div className="mt-auto pt-2">
+                    {isDatangNeedRevision ? (
+                      <Button
+                        onClick={() => setCameraModal({ isOpen: true, type: "REVISI_DATANG" })}
+                        className="w-full rounded-xl text-xs font-bold gap-1.5 h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        <span>Ambil Ulang Foto Masuk (Revisi)</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => setCameraModal({ isOpen: true, type: "DATANG" })}
+                        disabled={!!todayAbsensi?.check_in_time}
+                        className="w-full rounded-xl text-xs font-bold gap-1.5 h-10"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        <span>
+                          {todayAbsensi?.check_in_time ? "Sudah Presensi Datang" : "Presensi Datang Sekarang"}
+                        </span>
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Presensi Datang</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                    {todayAbsensi?.validation_status === "Perlu Revisi" ||
-                    todayAbsensi?.validation_status === "Ditolak"
-                      ? todayAbsensi.validation_notes
-                        ? `Catatan Guru: "${todayAbsensi.validation_notes}"`
-                        : "Foto selfie ditolak/kurang jelas, silakan ambil foto selfie ulang."
-                      : todayAbsensi?.check_in_time
-                      ? `Sudah presensi jam ${todayAbsensi.check_in_time}`
-                      : "Wajib live camera selfie saat tiba di kantor"}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-auto pt-2">
-                {todayAbsensi?.validation_status === "Perlu Revisi" ||
-                todayAbsensi?.validation_status === "Ditolak" ? (
-                  <Button
-                    onClick={() => setCameraModal({ isOpen: true, type: "REVISI_DATANG" })}
-                    className="w-full rounded-xl text-xs font-bold gap-1.5 h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>Ambil Ulang Foto (Revisi)</span>
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => setCameraModal({ isOpen: true, type: "DATANG" })}
-                    disabled={!!todayAbsensi?.check_in_time}
-                    className="w-full rounded-xl text-xs font-bold gap-1.5 h-10"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>
-                      {todayAbsensi?.check_in_time ? "Sudah Presensi Datang" : "Presensi Datang Sekarang"}
-                    </span>
-                  </Button>
-                )}
-              </div>
-            </div>
 
-            {/* Presensi Pulang Card */}
-            <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-full">
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600">
-                    <Clock className="h-5 w-5" />
+                {/* Presensi Pulang Card */}
+                <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-full">
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600">
+                        <Clock className="h-5 w-5" />
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                        Presensi Sore
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">Presensi Pulang</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        {isPulangNeedRevision
+                          ? todayAbsensi?.validation_notes
+                            ? `Catatan Guru: "${todayAbsensi.validation_notes}"`
+                            : "Foto selfie pulang ditolak/kurang jelas, silakan ambil foto selfie ulang."
+                          : todayAbsensi?.check_out_time
+                          ? `Sudah presensi pulang jam ${todayAbsensi.check_out_time}`
+                          : "Ambil foto selfie saat jam kerja berakhir"}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                    Presensi Sore
-                  </span>
+                  <div className="mt-auto pt-2">
+                    {isPulangNeedRevision ? (
+                      <Button
+                        onClick={() => setCameraModal({ isOpen: true, type: "REVISI_PULANG" })}
+                        className="w-full rounded-xl text-xs font-bold gap-1.5 h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        <span>Ambil Ulang Foto Pulang (Revisi)</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => setCameraModal({ isOpen: true, type: "PULANG" })}
+                        disabled={!todayAbsensi?.check_in_time || !!todayAbsensi?.check_out_time}
+                        className="w-full rounded-xl text-xs font-bold gap-1.5 h-10"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        <span>
+                          {todayAbsensi?.check_out_time
+                            ? "Sudah Presensi Pulang"
+                            : "Presensi Pulang Sekarang"}
+                        </span>
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Presensi Pulang</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                    {todayAbsensi?.check_out_time
-                      ? `Sudah presensi pulang jam ${todayAbsensi.check_out_time}`
-                      : "Ambil foto selfie saat jam kerja berakhir"}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-auto pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCameraModal({ isOpen: true, type: "PULANG" })}
-                  disabled={!todayAbsensi?.check_in_time || !!todayAbsensi?.check_out_time}
-                  className="w-full rounded-xl text-xs font-bold gap-1.5 h-10"
-                >
-                  <Camera className="h-3.5 w-3.5" />
-                  <span>
-                    {todayAbsensi?.check_out_time
-                      ? "Sudah Presensi Pulang"
-                      : "Presensi Pulang Sekarang"}
-                  </span>
-                </Button>
-              </div>
-            </div>
 
             {/* Tulis Jurnal Card */}
             <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-full">

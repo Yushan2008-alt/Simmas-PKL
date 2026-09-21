@@ -715,71 +715,78 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        {/* Jika belum ada mitra DUDI */}
-        {dudi.length === 0 ? (
-          <div className="py-12 px-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 text-center">
-            <Building2 className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
-            <h4 className="text-sm font-bold text-foreground">
-              Belum ada mitra DUDI terdaftar
-            </h4>
-            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
-              Daftarkan mitra DUDI terlebih dahulu di menu Data DUDI.
-            </p>
-            <div className="mt-4">
-              <Link href="/admin/dudi">
-                <Button size="sm" className="gap-2 font-bold shadow-xs">
-                  <Plus className="h-4 w-4" />
-                  <span>Tambah DUDI</span>
-                </Button>
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="w-full overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-border/80 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  <th className="pb-3 text-left font-bold">MITRA DUDI</th>
-                  <th className="pb-3 text-right font-bold pr-10 sm:pr-16">SISWA MAGANG</th>
-                  <th className="pb-3 text-left font-bold w-44 sm:w-56">PROPORSI</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {dudi.map((industry) => {
-                  const placements = penempatan.filter(
-                    (p) => p.dudi_id === industry.id && p.status !== "Dibatalkan"
-                  );
-                  const studentCount = placements.length;
-                  const quota = industry.quota || 1;
-                  const filledPercentage = quota > 0 ? Math.min(Math.round((studentCount / quota) * 100), 100) : 0;
+        {/* Hanya tampilkan DUDI yang berstatus Terverifikasi */}
+        {(() => {
+          const verifiedDudi = dudi.filter((d) => d.status === "Terverifikasi");
+          if (verifiedDudi.length === 0) {
+            return (
+              <div className="py-12 px-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 text-center">
+                <Building2 className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+                <h4 className="text-sm font-bold text-foreground">
+                  Belum ada mitra DUDI terverifikasi
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
+                  Mitra DUDI yang menunggu validasi belum ditampilkan di sebaran siswa. Verifikasi status mitra terlebih dahulu di menu Data DUDI.
+                </p>
+                <div className="mt-4">
+                  <Link href="/admin/dudi">
+                    <Button size="sm" className="gap-2 font-bold shadow-xs">
+                      <Plus className="h-4 w-4" />
+                      <span>Kelola Mitra DUDI</span>
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            );
+          }
 
-                  return (
-                    <tr key={industry.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="py-4 pr-4">
-                        <p className="text-sm font-bold text-foreground">{industry.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {industry.address || "Lokasi industri"}
-                        </p>
-                      </td>
-                      <td className="py-4 pr-10 sm:pr-16 text-right whitespace-nowrap">
-                        <span className="text-sm font-extrabold text-foreground">{studentCount}</span>
-                        <span className="text-xs font-semibold text-muted-foreground">/{quota}</span>
-                      </td>
-                      <td className="py-4">
-                        <div className="w-32 sm:w-44 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                            style={{ width: `${Math.max(filledPercentage, studentCount > 0 ? 10 : 0)}%` }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+          return (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border/80 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <th className="pb-3 text-left font-bold">MITRA DUDI</th>
+                    <th className="pb-3 text-right font-bold pr-10 sm:pr-16">SISWA MAGANG</th>
+                    <th className="pb-3 text-left font-bold w-44 sm:w-56">PROPORSI</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {verifiedDudi.map((industry) => {
+                    const placements = penempatan.filter(
+                      (p) => p.dudi_id === industry.id && p.status !== "Dibatalkan"
+                    );
+                    const studentCount = placements.length;
+                    const quota = industry.quota || 1;
+                    const filledPercentage = quota > 0 ? Math.min(Math.round((studentCount / quota) * 100), 100) : 0;
+
+                    return (
+                      <tr key={industry.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-4 pr-4">
+                          <p className="text-sm font-bold text-foreground">{industry.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {industry.address || "Lokasi industri"}
+                          </p>
+                        </td>
+                        <td className="py-4 pr-10 sm:pr-16 text-right whitespace-nowrap">
+                          <span className="text-sm font-extrabold text-foreground">{studentCount}</span>
+                          <span className="text-xs font-semibold text-muted-foreground">/{quota}</span>
+                        </td>
+                        <td className="py-4">
+                          <div className="w-32 sm:w-44 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                              style={{ width: `${Math.max(filledPercentage, studentCount > 0 ? 10 : 0)}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

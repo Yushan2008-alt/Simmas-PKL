@@ -609,7 +609,14 @@ export default function GuruJurnalPage() {
                                       : "bg-blue-600"
                                   }`}
                                 />
-                                {valStatus === "Ditolak" ? "Perlu Revisi" : valStatus}
+                                {(() => {
+                                  if (isValRevision) {
+                                    if (a.validation_target === "DATANG") return "Perlu Revisi (Masuk)";
+                                    if (a.validation_target === "PULANG") return "Perlu Revisi (Pulang)";
+                                    return "Perlu Revisi (Semua)";
+                                  }
+                                  return valStatus;
+                                })()}
                               </span>
                               {a.validation_notes && isValRevision && (
                                 <span

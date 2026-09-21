@@ -221,67 +221,82 @@ export default function SiswaAbsensiPage() {
         /* UNLOCKED ACTIVE STATE */
         <div className="space-y-8">
           {/* Alert Banner Perlu Revisi */}
-          {(todayAbsensi?.validation_status === "Perlu Revisi" || todayAbsensi?.validation_status === "Ditolak") && (
-            <div className="rounded-2xl border border-amber-300 bg-amber-500/10 p-5 shadow-2xs animate-in fade-in-50 duration-200">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
-                  <AlertCircle className="h-5 w-5" />
-                </div>
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <h4 className="text-sm font-bold text-foreground">
-                      Presensi Memerlukan Revisi Foto
-                    </h4>
-                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full self-start border border-amber-300">
-                      Status: Perlu Revisi
-                    </span>
+          {(todayAbsensi?.validation_status === "Perlu Revisi" || todayAbsensi?.validation_status === "Ditolak") && (() => {
+            const target = todayAbsensi.validation_target || (todayAbsensi.check_out_time ? "SEMUA" : "DATANG");
+            const isNeedDatang = target === "DATANG" || target === "SEMUA";
+            const isNeedPulang = (target === "PULANG" || target === "SEMUA") && !!todayAbsensi.check_out_time;
+
+            const bannerTitle =
+              target === "DATANG"
+                ? "Presensi Masuk Memerlukan Revisi Foto"
+                : target === "PULANG"
+                ? "Presensi Pulang Memerlukan Revisi Foto"
+                : "Presensi Masuk & Pulang Memerlukan Revisi Foto";
+
+            return (
+              <div className="rounded-2xl border border-amber-300 bg-amber-500/10 p-5 shadow-2xs animate-in fade-in-50 duration-200">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
+                    <AlertCircle className="h-5 w-5" />
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {todayAbsensi.validation_notes ? (
-                      <span>
-                        <strong className="text-foreground">Catatan Guru Pembimbing:</strong> &ldquo;{todayAbsensi.validation_notes}&rdquo;
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <h4 className="text-sm font-bold text-foreground">
+                        {bannerTitle}
+                      </h4>
+                      <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full self-start border border-amber-300">
+                        Status: Perlu Revisi ({target === "DATANG" ? "Masuk" : target === "PULANG" ? "Pulang" : "Semua"})
                       </span>
-                    ) : (
-                      <span>Foto bukti presensi Anda kurang jelas / buram. Silakan ambil ulang foto selfie Anda melalui tombol di bawah.</span>
-                    )}
-                  </p>
-                  <div className="pt-2 flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        setCameraModal({
-                          isOpen: true,
-                          type: "REVISI_DATANG",
-                          targetAbsensiId: todayAbsensi.id,
-                        })
-                      }
-                      className="rounded-xl px-3.5 h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs"
-                    >
-                      <Camera className="h-3.5 w-3.5" />
-                      <span>Ambil Ulang Foto Masuk</span>
-                    </Button>
-                    {todayAbsensi.check_out_time && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          setCameraModal({
-                            isOpen: true,
-                            type: "REVISI_PULANG",
-                            targetAbsensiId: todayAbsensi.id,
-                          })
-                        }
-                        className="rounded-xl px-3.5 h-8 text-xs font-bold border-amber-300 text-amber-800 hover:bg-amber-100 dark:text-amber-200 gap-1.5"
-                      >
-                        <Camera className="h-3.5 w-3.5" />
-                        <span>Ambil Ulang Foto Pulang</span>
-                      </Button>
-                    )}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {todayAbsensi.validation_notes ? (
+                        <span>
+                          <strong className="text-foreground">Catatan Guru Pembimbing:</strong> &ldquo;{todayAbsensi.validation_notes}&rdquo;
+                        </span>
+                      ) : (
+                        <span>Foto bukti presensi Anda kurang jelas / buram. Silakan ambil ulang foto selfie Anda melalui tombol di bawah.</span>
+                      )}
+                    </p>
+                    <div className="pt-2 flex flex-wrap items-center gap-2">
+                      {isNeedDatang && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setCameraModal({
+                              isOpen: true,
+                              type: "REVISI_DATANG",
+                              targetAbsensiId: todayAbsensi.id,
+                            })
+                          }
+                          className="rounded-xl px-3.5 h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          <span>Ambil Ulang Foto Masuk</span>
+                        </Button>
+                      )}
+                      {isNeedPulang && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setCameraModal({
+                              isOpen: true,
+                              type: "REVISI_PULANG",
+                              targetAbsensiId: todayAbsensi.id,
+                            })
+                          }
+                          className="rounded-xl px-3.5 h-8 text-xs font-bold border-amber-300 text-amber-800 hover:bg-amber-100 dark:text-amber-200 gap-1.5"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          <span>Ambil Ulang Foto Pulang</span>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Today's Dual Attendance Action Card (Datang & Pulang) */}
           <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xs space-y-6">
@@ -350,41 +365,55 @@ export default function SiswaAbsensiPage() {
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Status Validasi:{" "}
-                          <span
-                            className={`font-semibold ${
-                              todayAbsensi.validation_status === "Perlu Revisi" ||
-                              todayAbsensi.validation_status === "Ditolak"
-                                ? "text-amber-600 dark:text-amber-400"
-                                : todayAbsensi.validation_status === "Disetujui"
-                                ? "text-emerald-600"
-                                : "text-blue-600"
-                            }`}
-                          >
-                            {todayAbsensi.validation_status === "Ditolak"
-                              ? "Perlu Revisi"
-                              : todayAbsensi.validation_status || "Menunggu"}
-                          </span>
+                          {(() => {
+                            const isDatangNeedRevision =
+                              (todayAbsensi.validation_status === "Perlu Revisi" ||
+                                todayAbsensi.validation_status === "Ditolak") &&
+                              (!todayAbsensi.validation_target ||
+                                todayAbsensi.validation_target === "DATANG" ||
+                                todayAbsensi.validation_target === "SEMUA");
+
+                            if (isDatangNeedRevision) {
+                              return (
+                                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                  Perlu Revisi
+                                </span>
+                              );
+                            }
+                            if (todayAbsensi.validation_status === "Disetujui") {
+                              return <span className="font-semibold text-emerald-600">Disetujui</span>;
+                            }
+                            return <span className="font-semibold text-blue-600">Menunggu</span>;
+                          })()}
                         </p>
                       </div>
                     </div>
 
-                    {(todayAbsensi.validation_status === "Perlu Revisi" ||
-                      todayAbsensi.validation_status === "Ditolak") && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setCameraModal({
-                            isOpen: true,
-                            type: "REVISI_DATANG",
-                            targetAbsensiId: todayAbsensi.id,
-                          })
-                        }
-                        className="rounded-xl px-3 h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 gap-1"
-                      >
-                        <Camera className="h-3 w-3" />
-                        <span>Revisi Foto</span>
-                      </Button>
-                    )}
+                    {(() => {
+                      const isDatangNeedRevision =
+                        (todayAbsensi.validation_status === "Perlu Revisi" ||
+                          todayAbsensi.validation_status === "Ditolak") &&
+                        (!todayAbsensi.validation_target ||
+                          todayAbsensi.validation_target === "DATANG" ||
+                          todayAbsensi.validation_target === "SEMUA");
+
+                      return isDatangNeedRevision ? (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setCameraModal({
+                              isOpen: true,
+                              type: "REVISI_DATANG",
+                              targetAbsensiId: todayAbsensi.id,
+                            })
+                          }
+                          className="rounded-xl px-3 h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 gap-1"
+                        >
+                          <Camera className="h-3 w-3" />
+                          <span>Revisi Foto</span>
+                        </Button>
+                      ) : null;
+                    })()}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -449,41 +478,57 @@ export default function SiswaAbsensiPage() {
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Status Validasi:{" "}
-                          <span
-                            className={`font-semibold ${
-                              todayAbsensi.validation_status === "Perlu Revisi" ||
-                              todayAbsensi.validation_status === "Ditolak"
-                                ? "text-amber-600 dark:text-amber-400"
-                                : todayAbsensi.validation_status === "Disetujui"
-                                ? "text-emerald-600"
-                                : "text-blue-600"
-                            }`}
-                          >
-                            {todayAbsensi.validation_status === "Ditolak"
-                              ? "Perlu Revisi"
-                              : todayAbsensi.validation_status || "Menunggu"}
-                          </span>
+                          {(() => {
+                            const isPulangNeedRevision =
+                              (todayAbsensi.validation_status === "Perlu Revisi" ||
+                                todayAbsensi.validation_status === "Ditolak") &&
+                              (todayAbsensi.validation_target === "PULANG" ||
+                                todayAbsensi.validation_target === "SEMUA");
+
+                            if (isPulangNeedRevision) {
+                              return (
+                                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                  Perlu Revisi
+                                </span>
+                              );
+                            }
+                            // If only Datang needed revision, Pulang is still valid / disetujui
+                            if (
+                              todayAbsensi.validation_status === "Disetujui" ||
+                              todayAbsensi.validation_target === "DATANG"
+                            ) {
+                              return <span className="font-semibold text-emerald-600">Disetujui</span>;
+                            }
+                            return <span className="font-semibold text-blue-600">Menunggu</span>;
+                          })()}
                         </p>
                       </div>
                     </div>
 
-                    {(todayAbsensi.validation_status === "Perlu Revisi" ||
-                      todayAbsensi.validation_status === "Ditolak") && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setCameraModal({
-                            isOpen: true,
-                            type: "REVISI_PULANG",
-                            targetAbsensiId: todayAbsensi.id,
-                          })
-                        }
-                        className="rounded-xl px-3 h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 gap-1"
-                      >
-                        <Camera className="h-3 w-3" />
-                        <span>Revisi Foto</span>
-                      </Button>
-                    )}
+                    {(() => {
+                      const isPulangNeedRevision =
+                        (todayAbsensi.validation_status === "Perlu Revisi" ||
+                          todayAbsensi.validation_status === "Ditolak") &&
+                        (todayAbsensi.validation_target === "PULANG" ||
+                          todayAbsensi.validation_target === "SEMUA");
+
+                      return isPulangNeedRevision ? (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setCameraModal({
+                              isOpen: true,
+                              type: "REVISI_PULANG",
+                              targetAbsensiId: todayAbsensi.id,
+                            })
+                          }
+                          className="rounded-xl px-3 h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 gap-1"
+                        >
+                          <Camera className="h-3 w-3" />
+                          <span>Revisi Foto</span>
+                        </Button>
+                      ) : null;
+                    })()}
                   </div>
                 ) : (
                   <div className="space-y-3">
