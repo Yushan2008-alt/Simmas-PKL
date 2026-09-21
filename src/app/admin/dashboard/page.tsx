@@ -233,7 +233,7 @@ export default function AdminDashboardPage() {
               {totalSiswa}
             </p>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-muted-foreground">— Data real-time</span>
+              <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Lihat data siswa</span>
               <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
@@ -257,7 +257,7 @@ export default function AdminDashboardPage() {
               {totalGuru}
             </p>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-muted-foreground">— Data real-time</span>
+              <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Lihat data guru</span>
               <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
@@ -281,7 +281,7 @@ export default function AdminDashboardPage() {
               {totalDudi}
             </p>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-muted-foreground">— Data real-time</span>
+              <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Lihat mitra DUDI</span>
               <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
@@ -305,7 +305,7 @@ export default function AdminDashboardPage() {
               {totalPendingValidation}
             </p>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-muted-foreground">— Data real-time</span>
+              <span className="text-xs text-muted-foreground group-hover:text-amber-600 transition-colors">Perlu verifikasi</span>
               <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>

@@ -59,6 +59,7 @@ export interface Penempatan {
 }
 
 export type AbsensiStatus = "Hadir" | "Sakit" | "Izin" | "Alfa";
+export type AbsensiValidationStatus = "Menunggu" | "Disetujui" | "Perlu Revisi" | "Ditolak";
 
 export interface Absensi {
   id: string;
@@ -70,6 +71,9 @@ export interface Absensi {
   check_out_time?: string;
   check_out_photo?: string;
   notes?: string;
+  validation_status?: AbsensiValidationStatus;
+  validation_notes?: string;
+  validated_at?: string;
   created_at: string;
   student?: Siswa;
 }
@@ -99,6 +103,9 @@ export interface Jurnal {
   student_id: string;
   date: string;
   activity: string;
+  kendala?: string;
+  tindak_lanjut?: string;
+  photo_url?: string;
   status: JurnalStatus;
   teacher_feedback?: string;
   created_at: string;

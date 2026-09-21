@@ -1,73 +1,71 @@
 "use client";
 
 import * as React from "react";
-import { X, CheckCircle2, AlertCircle, FileText, User, Calendar } from "lucide-react";
+import { X, CheckCircle2, XCircle, Clock, Calendar, User, FileText, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Jurnal, JurnalStatus } from "@/types/database";
-import { validateJurnal } from "@/lib/supabase/services";
+import { Absensi, AbsensiValidationStatus } from "@/types/database";
+import { validateAbsensi } from "@/lib/supabase/services";
 
-interface RevisiJurnalModalProps {
+interface ValidasiAbsensiModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  jurnal: Jurnal | null;
+  absensi: Absensi | null;
 }
 
-export function RevisiJurnalModal({
+export function ValidasiAbsensiModal({
   isOpen,
   onClose,
   onSuccess,
-  jurnal,
-}: RevisiJurnalModalProps) {
-  const [selectedStatus, setSelectedStatus] = React.useState<"Disetujui" | "Perlu Revisi">("Disetujui");
-  const [feedback, setFeedback] = React.useState("");
+  absensi,
+}: ValidasiAbsensiModalProps) {
+  const [status, setStatus] = React.useState<"Disetujui" | "Perlu Revisi">("Disetujui");
+  const [notes, setNotes] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
-    if (isOpen && jurnal) {
-      if (jurnal.status === "Perlu Revisi") {
-        setSelectedStatus("Perlu Revisi");
+    if (isOpen && absensi) {
+      if (absensi.validation_status === "Perlu Revisi" || absensi.validation_status === "Ditolak") {
+        setStatus("Perlu Revisi");
       } else {
-        setSelectedStatus("Disetujui");
+        setStatus("Disetujui");
       }
-      setFeedback(jurnal.teacher_feedback || "");
+      setNotes(absensi.validation_notes || "");
       setError(null);
     }
-  }, [isOpen, jurnal]);
+  }, [isOpen, absensi]);
 
-  if (!isOpen || !jurnal) return null;
+  if (!isOpen || !absensi) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedStatus === "Perlu Revisi" && !feedback.trim()) {
-      setError("Catatan revisi wajib diisi untuk memberi arahan perbaikan kepada siswa.");
+    if (status === "Perlu Revisi" && !notes.trim()) {
+      setError("Catatan revisi wajib diisi agar siswa mengetahui hal yang harus diperbaiki (misal: foto kurang jelas).");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await validateJurnal(
-        jurnal.id,
-        selectedStatus,
-        feedback.trim() || undefined
-      );
-
+      await validateAbsensi(absensi.id, status, notes.trim() || undefined);
       toast.success(
-        selectedStatus === "Disetujui"
-          ? "Jurnal Berhasil Disetujui!"
-          : "Catatan Revisi Terkirim!",
+        status === "Disetujui"
+          ? "Presensi Berhasil Disetujui!"
+          : "Permintaan Revisi Terkirim!",
         {
-          description: `Status jurnal ${jurnal.student?.name || "siswa"} diubah menjadi '${selectedStatus}'.`,
+          description:
+            status === "Disetujui"
+              ? `Presensi ${absensi.student?.name || "siswa"} ditandai sebagai 'Disetujui'.`
+              : `Status presensi diubah menjadi 'Perlu Revisi'. Siswa dapat mengambil ulang foto presensi.`,
         }
       );
       onSuccess();
       onClose();
     } catch (err: any) {
-      toast.error("Gagal memvalidasi jurnal", {
+      toast.error("Gagal memvalidasi presensi", {
         description: err?.message || "Terjadi kesalahan sistem.",
       });
     } finally {
@@ -86,10 +84,10 @@ export function RevisiJurnalModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-foreground">
-                Validasi Jurnal Kegiatan
+                Validasi Presensi Siswa
               </h3>
               <p className="text-xs text-muted-foreground">
-                Tentukan status verifikasi dan berikan catatan evaluasi
+                Tinjau dan tetapkan status verifikasi kehadiran
               </p>
             </div>
           </div>
@@ -104,48 +102,31 @@ export function RevisiJurnalModal({
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Student & Activity Preview */}
+          {/* Siswa & Attendance Info */}
           <div className="p-3.5 rounded-xl bg-muted/40 border border-border/80 space-y-2">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground flex items-center gap-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-foreground flex items-center gap-1.5">
                 <User className="h-3.5 w-3.5 text-blue-600" />
-                {jurnal.student?.name || "Siswa"} ({jurnal.student?.class_name || "-"})
+                {absensi.student?.name || "Siswa"}
               </span>
-              <span className="flex items-center gap-1">
+              <span className="text-muted-foreground flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                {jurnal.date}
+                {absensi.date}
               </span>
             </div>
-            <div className="space-y-1.5 text-xs">
-              <div className="text-muted-foreground bg-background/60 p-2.5 rounded-lg border border-border/40 space-y-1.5">
-                <div>
-                  <span className="font-semibold text-foreground text-[10px] uppercase block">Kegiatan:</span>
-                  <p className="text-foreground leading-relaxed">{jurnal.activity}</p>
-                </div>
-                {jurnal.kendala ? (
-                  <div>
-                    <span className="font-semibold text-amber-600 dark:text-amber-400 text-[10px] uppercase block">Kendala:</span>
-                    <p className="text-muted-foreground">{jurnal.kendala}</p>
-                  </div>
-                ) : null}
-                {jurnal.tindak_lanjut ? (
-                  <div>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400 text-[10px] uppercase block">Rencana Tindak Lanjut:</span>
-                    <p className="text-muted-foreground">{jurnal.tindak_lanjut}</p>
-                  </div>
-                ) : null}
-                {jurnal.photo_url ? (
-                  <div className="pt-1">
-                    <span className="font-semibold text-muted-foreground text-[10px] uppercase block mb-1">Dokumentasi:</span>
-                    <img
-                      src={jurnal.photo_url}
-                      alt="Dokumentasi Jurnal"
-                      className="w-full max-h-36 object-cover rounded-lg border border-border"
-                    />
-                  </div>
-                ) : null}
-              </div>
+
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-border/50">
+              <span className="text-muted-foreground">Jenis Presensi:</span>
+              <span className="font-bold px-2 py-0.5 rounded-full text-[11px] bg-blue-50 text-blue-700 border border-blue-200">
+                {absensi.status}
+              </span>
             </div>
+
+            {absensi.notes && (
+              <div className="text-[11px] text-muted-foreground italic bg-background/60 p-2 rounded-lg border border-border/40">
+                &ldquo;{absensi.notes}&rdquo;
+              </div>
+            )}
           </div>
 
           {/* Status Choice */}
@@ -157,11 +138,11 @@ export function RevisiJurnalModal({
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedStatus("Disetujui");
-                  if (error) setError(null);
+                  setStatus("Disetujui");
+                  setError(null);
                 }}
                 className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all ${
-                  selectedStatus === "Disetujui"
+                  status === "Disetujui"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-400 shadow-xs dark:bg-emerald-950/40"
                     : "bg-card text-muted-foreground border-border hover:bg-muted"
                 }`}
@@ -173,11 +154,11 @@ export function RevisiJurnalModal({
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedStatus("Perlu Revisi");
-                  if (error) setError(null);
+                  setStatus("Perlu Revisi");
+                  setError(null);
                 }}
                 className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all ${
-                  selectedStatus === "Perlu Revisi"
+                  status === "Perlu Revisi"
                     ? "bg-amber-50 text-amber-700 border-amber-400 shadow-xs dark:bg-amber-950/40"
                     : "bg-card text-muted-foreground border-border hover:bg-muted"
                 }`}
@@ -188,48 +169,42 @@ export function RevisiJurnalModal({
             </div>
           </div>
 
-          {/* Feedback Input */}
+          {/* Catatan / Keterangan Evaluasi */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-foreground flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Catatan Evaluasi Guru</span>
+                <span>Catatan / Alasan {status === "Perlu Revisi" ? "(Wajib)" : "(Opsional)"}</span>
               </span>
-              {selectedStatus === "Perlu Revisi" ? (
-                <span className="text-amber-600 text-[10px] font-semibold">Wajib diisi</span>
-              ) : (
-                <span className="text-muted-foreground text-[10px] font-normal">Opsional</span>
+              {status === "Perlu Revisi" && (
+                <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
+                  Wajib Beri Catatan
+                </span>
               )}
             </label>
             <Textarea
               placeholder={
-                selectedStatus === "Disetujui"
-                  ? "Bagus, kegiatan sesuai arahan dan SOP magang."
-                  : "Contoh: Mohon lengkapi dokumentasi foto aktivitas atau rincian masalah..."
+                status === "Disetujui"
+                  ? "Contoh: Surat izin / presensi valid dan terverifikasi."
+                  : "Contoh: Foto bukti selfie kurang jelas / buram. Mohon ambil ulang foto selfie yang terang."
               }
-              value={feedback}
+              value={notes}
               onChange={(e) => {
-                setFeedback(e.target.value);
+                setNotes(e.target.value);
                 if (error) setError(null);
               }}
               rows={3}
-              className={`rounded-xl resize-none text-xs ${error ? "border-red-500" : ""}`}
+              className={`rounded-xl resize-none text-xs ${error ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
-            {error ? (
-              <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                <AlertCircle className="h-3 w-3" />
-                {error}
-              </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                {selectedStatus === "Perlu Revisi"
-                  ? "Siswa akan menerima instruksi ini dan hanya dapat mengedit laporannya."
-                  : "Catatan akan ditampilkan pada rincian jurnal kegiatan siswa."}
+            {error && (
+              <p className="text-[11px] text-red-500 flex items-center gap-1 mt-1 font-medium">
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                <span>{error}</span>
               </p>
             )}
           </div>
 
-          {/* Footer Actions */}
+          {/* Actions */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border mt-4">
             <Button
               type="button"
@@ -244,12 +219,16 @@ export function RevisiJurnalModal({
               type="submit"
               disabled={isSubmitting}
               className={`rounded-xl px-5 text-xs font-bold h-9 shadow-xs text-white ${
-                selectedStatus === "Disetujui"
+                status === "Disetujui"
                   ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
                   : "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
               }`}
             >
-              {isSubmitting ? "Menyimpan..." : "Simpan Validasi"}
+              {isSubmitting
+                ? "Menyimpan..."
+                : status === "Disetujui"
+                ? "Simpan Validasi"
+                : "Minta Revisi Presensi"}
             </Button>
           </div>
         </form>
@@ -257,6 +236,3 @@ export function RevisiJurnalModal({
     </div>
   );
 }
-
-// Alias export for clarity
-export const ValidasiJurnalModal = RevisiJurnalModal;

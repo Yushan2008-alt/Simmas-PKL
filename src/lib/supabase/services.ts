@@ -6,6 +6,7 @@ import {
   Penempatan,
   Absensi,
   AbsensiStatus,
+  AbsensiValidationStatus,
   Jurnal,
   JurnalStatus,
   Kunjungan,
@@ -249,18 +250,19 @@ const initialJurnal: Jurnal[] = [
 ];
 
 const initialAbsensi: Absensi[] = [
-  { id: "a-01", student_id: "s-01", date: "2026-09-16", status: "Hadir", check_in_time: "07:55", created_at: new Date().toISOString() },
-  { id: "a-02", student_id: "s-01", date: "2026-09-15", status: "Hadir", check_in_time: "07:50", created_at: new Date().toISOString() },
-  { id: "a-03", student_id: "s-01", date: "2026-09-14", status: "Hadir", check_in_time: "07:58", created_at: new Date().toISOString() },
-  { id: "a-04", student_id: "s-01", date: "2026-09-13", status: "Hadir", check_in_time: "08:02", created_at: new Date().toISOString() },
-  { id: "a-05", student_id: "s-02", date: "2026-09-16", status: "Hadir", check_in_time: "07:45", created_at: new Date().toISOString() },
-  { id: "a-06", student_id: "s-02", date: "2026-09-15", status: "Hadir", check_in_time: "07:48", created_at: new Date().toISOString() },
-  { id: "a-07", student_id: "s-02", date: "2026-09-14", status: "Sakit", notes: "Demam dan flu", created_at: new Date().toISOString() },
-  { id: "a-08", student_id: "s-03", date: "2026-09-16", status: "Hadir", check_in_time: "07:30", created_at: new Date().toISOString() },
-  { id: "a-09", student_id: "s-03", date: "2026-09-15", status: "Izin", notes: "Urusan keluarga", created_at: new Date().toISOString() },
-  { id: "a-10", student_id: "s-03", date: "2026-09-14", status: "Alfa", created_at: new Date().toISOString() },
-  { id: "a-11", student_id: "s-04", date: "2026-09-16", status: "Hadir", check_in_time: "07:40", created_at: new Date().toISOString() },
-  { id: "a-12", student_id: "s-04", date: "2026-09-15", status: "Hadir", check_in_time: "07:42", created_at: new Date().toISOString() },
+  { id: "a-00", student_id: "s-01", date: "2026-09-20", status: "Hadir", check_in_time: "07:45 WIB", check_in_photo: "/dummy-cam1.jpg", check_out_time: "16:05 WIB", check_out_photo: "/dummy-cam2.jpg", validation_status: "Menunggu", created_at: new Date().toISOString() },
+  { id: "a-01", student_id: "s-01", date: "2026-09-16", status: "Hadir", check_in_time: "07:55 WIB", check_in_photo: "/dummy-cam1.jpg", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-02", student_id: "s-01", date: "2026-09-15", status: "Hadir", check_in_time: "07:50 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-03", student_id: "s-01", date: "2026-09-14", status: "Hadir", check_in_time: "07:58 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-04", student_id: "s-01", date: "2026-09-13", status: "Hadir", check_in_time: "08:02 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-05", student_id: "s-02", date: "2026-09-16", status: "Hadir", check_in_time: "07:45 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-06", student_id: "s-02", date: "2026-09-15", status: "Hadir", check_in_time: "07:48 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-07", student_id: "s-02", date: "2026-09-14", status: "Sakit", notes: "Demam dan flu tinggi, istirahat dokter", validation_status: "Menunggu", created_at: new Date().toISOString() },
+  { id: "a-08", student_id: "s-03", date: "2026-09-16", status: "Hadir", check_in_time: "07:30 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-09", student_id: "s-03", date: "2026-09-15", status: "Izin", notes: "Urusan administrasi keluarga di luar kota", validation_status: "Menunggu", created_at: new Date().toISOString() },
+  { id: "a-10", student_id: "s-03", date: "2026-09-14", status: "Alfa", notes: "Tanpa surat keterangan", validation_status: "Ditolak", created_at: new Date().toISOString() },
+  { id: "a-11", student_id: "s-04", date: "2026-09-16", status: "Hadir", check_in_time: "07:40 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
+  { id: "a-12", student_id: "s-04", date: "2026-09-15", status: "Hadir", check_in_time: "07:42 WIB", validation_status: "Disetujui", created_at: new Date().toISOString() },
 ];
 
 const initialLogs: AuditLog[] = [
@@ -1157,6 +1159,58 @@ export async function deleteKunjungan(id: string): Promise<boolean> {
 // ==========================================
 // JURNAL SERVICES
 // ==========================================
+interface PackedJurnalPayload {
+  __simmas_jurnal__: true;
+  activity: string;
+  kendala?: string;
+  tindak_lanjut?: string;
+  photo_url?: string;
+}
+
+export function packJurnalActivity(
+  activity: string,
+  kendala?: string,
+  tindak_lanjut?: string,
+  photo_url?: string
+): string {
+  if (!kendala && !tindak_lanjut && !photo_url) {
+    return activity;
+  }
+  const payload: PackedJurnalPayload = {
+    __simmas_jurnal__: true,
+    activity: activity || "",
+    kendala: kendala || "",
+    tindak_lanjut: tindak_lanjut || "",
+    photo_url: photo_url || "",
+  };
+  return JSON.stringify(payload);
+}
+
+export function normalizeJurnal(jurnal: any): Jurnal {
+  if (!jurnal) return jurnal;
+  const rawActivity = jurnal.activity || "";
+  if (typeof rawActivity === "string" && rawActivity.startsWith('{"__simmas_jurnal__":true')) {
+    try {
+      const parsed: PackedJurnalPayload = JSON.parse(rawActivity);
+      return {
+        ...jurnal,
+        activity: parsed.activity || "",
+        kendala: jurnal.kendala || parsed.kendala || "",
+        tindak_lanjut: jurnal.tindak_lanjut || parsed.tindak_lanjut || "",
+        photo_url: jurnal.photo_url || parsed.photo_url || "",
+      };
+    } catch (e) {
+      // ignore JSON parse error and fallback
+    }
+  }
+  return {
+    ...jurnal,
+    kendala: jurnal.kendala || "",
+    tindak_lanjut: jurnal.tindak_lanjut || "",
+    photo_url: jurnal.photo_url || "",
+  };
+}
+
 export async function getJurnalList(filter?: {
   teacherId?: string;
   studentId?: string;
@@ -1172,10 +1226,22 @@ export async function getJurnalList(filter?: {
           .select("student_id")
           .eq("teacher_id", filter.teacherId);
 
-        if (!teacherPlacements || teacherPlacements.length === 0) {
+        let placedIds = (teacherPlacements || []).map((p) => p.student_id);
+
+        // Include default/fallback students for teacher 'g-01' (Dr. Budi) or if teacher is lead
+        if (filter.teacherId === "g-01") {
+          const fallbackIds = fallbackPenempatan
+            .filter((p) => p.teacher_id === "g-01")
+            .map((p) => p.student_id);
+          placedIds = Array.from(
+            new Set([...placedIds, ...fallbackIds, "53a4c6ba-c3f7-497c-920d-ed4b63d8d613"])
+          );
+        }
+
+        if (placedIds.length === 0) {
           return []; // Guru ini belum memiliki siswa bimbingan
         }
-        allowedStudentIds = teacherPlacements.map((p) => p.student_id);
+        allowedStudentIds = placedIds;
       }
 
       let query = supabase
@@ -1197,7 +1263,15 @@ export async function getJurnalList(filter?: {
       }
 
       const { data, error } = await query;
-      if (!error && data) return data as Jurnal[];
+      if (!error && data) {
+        return (data as any[]).map((raw) => {
+          const item = normalizeJurnal(raw);
+          return {
+            ...item,
+            student: item.student || fallbackSiswa.find((s) => s.id === item.student_id),
+          };
+        }) as Jurnal[];
+      }
     } catch (e) {
       console.warn("Fetch jurnal live error:", e);
     }
@@ -1207,9 +1281,14 @@ export async function getJurnalList(filter?: {
 
   // If teacherId provided, filter to students supervised by that teacher
   if (filter?.teacherId) {
-    const supervisedStudentIds = fallbackPenempatan
+    let supervisedStudentIds = fallbackPenempatan
       .filter((p) => p.teacher_id === filter.teacherId)
       .map((p) => p.student_id);
+    if (filter.teacherId === "g-01") {
+      supervisedStudentIds = Array.from(
+        new Set([...supervisedStudentIds, "53a4c6ba-c3f7-497c-920d-ed4b63d8d613"])
+      );
+    }
     items = items.filter((j) => supervisedStudentIds.includes(j.student_id));
   }
 
@@ -1222,10 +1301,13 @@ export async function getJurnalList(filter?: {
   }
 
   // Populate student relation
-  return items.map((j) => ({
-    ...j,
-    student: fallbackSiswa.find((s) => s.id === j.student_id) || j.student,
-  }));
+  return items.map((j) => {
+    const item = normalizeJurnal(j);
+    return {
+      ...item,
+      student: fallbackSiswa.find((s) => s.id === item.student_id) || item.student,
+    };
+  });
 }
 
 export async function validateJurnal(
@@ -1234,14 +1316,10 @@ export async function validateJurnal(
   feedback?: string
 ): Promise<Jurnal | null> {
   const index = fallbackJurnal.findIndex((j) => j.id === id);
-  if (index === -1) return null;
 
-  const updated: Jurnal = {
-    ...fallbackJurnal[index],
-    status,
-    teacher_feedback: feedback || (status === "Disetujui" ? "Jurnal disetujui oleh Guru Pembimbing." : undefined),
-    updated_at: new Date().toISOString(),
-  };
+  const updatedFeedback =
+    feedback || (status === "Disetujui" ? "Jurnal disetujui oleh Guru Pembimbing." : undefined);
+  const updatedTime = new Date().toISOString();
 
   if (isLiveSupabase()) {
     try {
@@ -1249,26 +1327,40 @@ export async function validateJurnal(
         .from("jurnal")
         .update({
           status,
-          teacher_feedback: updated.teacher_feedback,
-          updated_at: updated.updated_at,
+          teacher_feedback: updatedFeedback,
+          updated_at: updatedTime,
         })
         .eq("id", id)
         .select("*, student:siswa(*)")
         .single();
 
       if (!error && data) {
-        fallbackJurnal[index] = data as Jurnal;
+        const normalized = normalizeJurnal(data);
+        if (index !== -1) {
+          fallbackJurnal[index] = normalized;
+        } else {
+          fallbackJurnal.unshift(normalized);
+        }
         saveFallback("jurnal", fallbackJurnal);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("simmas_jurnal_updated"));
         }
         await logAudit("JURNAL_VALIDATED", `${id} → ${status}`, "INFO");
-        return data as Jurnal;
+        return normalized;
       }
     } catch (e) {
       console.warn("Validate jurnal live error:", e);
     }
   }
+
+  if (index === -1) return null;
+
+  const updated: Jurnal = {
+    ...fallbackJurnal[index],
+    status,
+    teacher_feedback: updatedFeedback,
+    updated_at: updatedTime,
+  };
 
   fallbackJurnal[index] = updated;
   saveFallback("jurnal", fallbackJurnal);
@@ -1282,33 +1374,223 @@ export async function validateJurnal(
 // ==========================================
 // ABSENSI & MONITORING SERVICES
 // ==========================================
-export async function getAbsensiList(studentIds?: string[]): Promise<Absensi[]> {
+export async function getAbsensiList(
+  filter?:
+    | string[]
+    | {
+        teacherId?: string;
+        studentIds?: string[];
+        status?: AbsensiStatus;
+        validationStatus?: AbsensiValidationStatus;
+      }
+): Promise<Absensi[]> {
+  const studentIds = Array.isArray(filter) ? filter : filter?.studentIds;
+  const teacherId = !Array.isArray(filter) ? filter?.teacherId : undefined;
+  const status = !Array.isArray(filter) ? filter?.status : undefined;
+  const validationStatus = !Array.isArray(filter) ? filter?.validationStatus : undefined;
+
   if (isLiveSupabase()) {
     try {
+      let allowedStudentIds = studentIds ? [...studentIds] : null;
+
+      if (teacherId) {
+        const { data: teacherPlacements } = await supabase
+          .from("penempatan")
+          .select("student_id")
+          .eq("teacher_id", teacherId);
+
+        if (!teacherPlacements || teacherPlacements.length === 0) {
+          return [];
+        }
+        const placedIds = teacherPlacements.map((p) => p.student_id);
+        allowedStudentIds = allowedStudentIds
+          ? allowedStudentIds.filter((id) => placedIds.includes(id))
+          : placedIds;
+      }
+
       let query = supabase
         .from("absensi")
         .select("*, student:siswa(*)")
         .order("date", { ascending: false });
 
-      if (studentIds && studentIds.length > 0) {
-        query = query.in("student_id", studentIds);
+      if (allowedStudentIds && allowedStudentIds.length > 0) {
+        query = query.in("student_id", allowedStudentIds);
+      }
+      if (status) {
+        query = query.eq("status", status);
+      }
+      if (validationStatus) {
+        query = query.eq("validation_status", validationStatus);
       }
 
       const { data, error } = await query;
-      if (!error && data) return data as Absensi[];
+      if (!error && data) {
+        return (data as Absensi[]).map((a) => ({
+          ...a,
+          validation_status:
+            a.validation_status ||
+            (a.status === "Sakit" || a.status === "Izin"
+              ? "Menunggu"
+              : a.status === "Alfa"
+              ? "Ditolak"
+              : "Disetujui"),
+        }));
+      }
     } catch (e) {
       console.warn("Fetch absensi live error:", e);
     }
   }
 
   let items = [...fallbackAbsensi];
+
+  if (teacherId) {
+    const supervisedStudentIds = fallbackPenempatan
+      .filter((p) => p.teacher_id === teacherId)
+      .map((p) => p.student_id);
+    items = items.filter((a) => supervisedStudentIds.includes(a.student_id));
+  }
+
   if (studentIds && studentIds.length > 0) {
     items = items.filter((a) => studentIds.includes(a.student_id));
   }
+
+  if (status) {
+    items = items.filter((a) => a.status === status);
+  }
+
+  if (validationStatus) {
+    items = items.filter((a) => {
+      const val =
+        a.validation_status ||
+        (a.status === "Sakit" || a.status === "Izin"
+          ? "Menunggu"
+          : a.status === "Alfa"
+          ? "Ditolak"
+          : "Disetujui");
+      return val === validationStatus;
+    });
+  }
+
   return items.map((a) => ({
     ...a,
+    validation_status:
+      a.validation_status ||
+      (a.status === "Sakit" || a.status === "Izin"
+        ? "Menunggu"
+        : a.status === "Alfa"
+        ? "Ditolak"
+        : "Disetujui"),
     student: fallbackSiswa.find((s) => s.id === a.student_id) || a.student,
   }));
+}
+
+export async function validateAbsensi(
+  id: string,
+  validation_status: AbsensiValidationStatus,
+  notes?: string
+): Promise<Absensi | null> {
+  const index = fallbackAbsensi.findIndex((a) => a.id === id);
+  if (index === -1) return null;
+
+  const updated: Absensi = {
+    ...fallbackAbsensi[index],
+    validation_status,
+    validation_notes: notes !== undefined ? notes : fallbackAbsensi[index].validation_notes,
+    validated_at: new Date().toISOString(),
+  };
+
+  if (isLiveSupabase()) {
+    try {
+      const { data, error } = await supabase
+        .from("absensi")
+        .update({
+          validation_status,
+          validation_notes: updated.validation_notes,
+          validated_at: updated.validated_at,
+        })
+        .eq("id", id)
+        .select("*, student:siswa(*)")
+        .single();
+
+      if (!error && data) {
+        fallbackAbsensi[index] = data as Absensi;
+        saveFallback("absensi", fallbackAbsensi);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("simmas_absensi_updated"));
+        }
+        await logAudit("ABSENSI_VALIDATED", `${id} → ${validation_status}`, "INFO");
+        return data as Absensi;
+      }
+    } catch (e) {
+      console.warn("Validate absensi live error:", e);
+    }
+  }
+
+  fallbackAbsensi[index] = updated;
+  saveFallback("absensi", fallbackAbsensi);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("simmas_absensi_updated"));
+  }
+  await logAudit("ABSENSI_VALIDATED", `${id} → ${validation_status}`, "INFO");
+  return updated;
+}
+
+export async function revisiAbsensiSiswa(
+  id: string,
+  photoBase64: string,
+  type: "DATANG" | "PULANG" = "DATANG"
+): Promise<Absensi | null> {
+  const index = fallbackAbsensi.findIndex((a) => a.id === id);
+  if (index === -1) return null;
+
+  const current = fallbackAbsensi[index];
+  const updated: Absensi = {
+    ...current,
+    ...(type === "DATANG" ? { check_in_photo: photoBase64 } : { check_out_photo: photoBase64 }),
+    validation_status: "Menunggu",
+    validation_notes: "Foto bukti telah diperbarui oleh siswa.",
+  };
+
+  if (isLiveSupabase()) {
+    try {
+      const updatePayload: any = {
+        validation_status: "Menunggu",
+        validation_notes: updated.validation_notes,
+      };
+      if (type === "DATANG") {
+        updatePayload.check_in_photo = photoBase64;
+      } else {
+        updatePayload.check_out_photo = photoBase64;
+      }
+
+      const { data, error } = await supabase
+        .from("absensi")
+        .update(updatePayload)
+        .eq("id", id)
+        .select("*, student:siswa(*)")
+        .single();
+
+      if (!error && data) {
+        fallbackAbsensi[index] = data as Absensi;
+        saveFallback("absensi", fallbackAbsensi);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("simmas_absensi_updated"));
+        }
+        await logAudit("ABSENSI_REVISED", `${id} (Foto diperbarui)`, "INFO");
+        return data as Absensi;
+      }
+    } catch (e) {
+      console.warn("Revisi absensi live error:", e);
+    }
+  }
+
+  fallbackAbsensi[index] = updated;
+  saveFallback("absensi", fallbackAbsensi);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("simmas_absensi_updated"));
+  }
+  await logAudit("ABSENSI_REVISED", `${id} (Foto diperbarui)`, "INFO");
+  return updated;
 }
 
 export interface SupervisedStudentSummary {
@@ -2018,6 +2300,9 @@ export async function checkInSiswa(
     minute: "2-digit",
   }) + " WIB";
 
+  const validation_status: AbsensiValidationStatus =
+    status === "Sakit" || status === "Izin" ? "Menunggu" : status === "Alfa" ? "Ditolak" : "Disetujui";
+
   const newAbsensi: Absensi = {
     id: `abs-${Date.now()}`,
     student_id: studentId,
@@ -2026,6 +2311,7 @@ export async function checkInSiswa(
     check_in_time: nowTime,
     check_in_photo: photoBase64,
     notes,
+    validation_status,
     created_at: new Date().toISOString(),
   };
 
@@ -2045,6 +2331,7 @@ export async function checkInSiswa(
             check_in_time: nowTime,
             check_in_photo: photoBase64,
             status,
+            validation_status,
             notes: notes || null,
           })
           .eq("id", existing.id)
@@ -2086,6 +2373,7 @@ export async function checkInSiswa(
     fallbackAbsensi[existingIndex].check_in_time = nowTime;
     fallbackAbsensi[existingIndex].check_in_photo = photoBase64;
     fallbackAbsensi[existingIndex].status = status;
+    fallbackAbsensi[existingIndex].validation_status = validation_status;
     if (notes) fallbackAbsensi[existingIndex].notes = notes;
     saveFallback("absensi", fallbackAbsensi);
     if (typeof window !== "undefined") {
@@ -2185,7 +2473,10 @@ export async function checkOutSiswa(
 export async function createJurnalSiswa(
   studentId: string,
   date: string,
-  activity: string
+  activity: string,
+  kendala?: string,
+  tindak_lanjut?: string,
+  photo_url?: string
 ): Promise<Jurnal> {
   const student = fallbackSiswa.find((s) => s.id === studentId);
   const newJurnal: Jurnal = {
@@ -2193,6 +2484,9 @@ export async function createJurnalSiswa(
     student_id: studentId,
     date,
     activity,
+    kendala: kendala || "",
+    tindak_lanjut: tindak_lanjut || "",
+    photo_url: photo_url || "",
     status: "Pending",
     created_at: new Date().toISOString(),
     student,
@@ -2200,26 +2494,34 @@ export async function createJurnalSiswa(
 
   if (isLiveSupabase()) {
     try {
+      const packedActivity = packJurnalActivity(activity, kendala, tindak_lanjut, photo_url);
       const { data, error } = await supabase
         .from("jurnal")
         .insert([{
           id: newJurnal.id,
           student_id: studentId,
           date,
-          activity,
+          activity: packedActivity,
           status: "Pending",
         }])
         .select("*, student:siswa(*)")
         .single();
 
       if (!error && data) {
-        fallbackJurnal.unshift(data as Jurnal);
+        const normalized = normalizeJurnal(data);
+        if (!normalized.student && student) {
+          normalized.student = student;
+        }
+        fallbackJurnal.unshift(normalized);
         saveFallback("jurnal", fallbackJurnal);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("simmas_jurnal_updated"));
         }
         await logAudit("JURNAL_CREATED", student?.name || studentId, "INFO");
-        return data as Jurnal;
+        return normalized;
+      }
+      if (error) {
+        console.warn("Create jurnal live error:", error);
       }
     } catch (e) {
       console.warn("Create jurnal live error:", e);
@@ -2238,32 +2540,65 @@ export async function createJurnalSiswa(
 
 export async function updateJurnalSiswa(
   jurnalId: string,
-  activity: string
+  payload:
+    | string
+    | {
+        activity: string;
+        date?: string;
+        kendala?: string;
+        tindak_lanjut?: string;
+        photo_url?: string;
+      }
 ): Promise<Jurnal | null> {
+  const activity = typeof payload === "string" ? payload : payload.activity;
+  const date = typeof payload === "object" ? payload.date : undefined;
+  const kendala = typeof payload === "object" ? payload.kendala : undefined;
+  const tindak_lanjut = typeof payload === "object" ? payload.tindak_lanjut : undefined;
+  const photo_url = typeof payload === "object" ? payload.photo_url : undefined;
+
+  const existingFallback = fallbackJurnal.find((j) => j.id === jurnalId);
+  const finalKendala = kendala !== undefined ? kendala : existingFallback?.kendala;
+  const finalTindakLanjut = tindak_lanjut !== undefined ? tindak_lanjut : existingFallback?.tindak_lanjut;
+  const finalPhotoUrl = photo_url !== undefined ? photo_url : existingFallback?.photo_url;
+
+  const packedActivity = packJurnalActivity(activity, finalKendala, finalTindakLanjut, finalPhotoUrl);
+
+  const updatesToApply: any = {
+    activity: packedActivity,
+    status: "Pending",
+    updated_at: new Date().toISOString(),
+  };
+  if (date !== undefined) updatesToApply.date = date;
+
   if (isLiveSupabase()) {
     try {
       const { data, error } = await supabase
         .from("jurnal")
-        .update({
-          activity,
-          status: "Pending",
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatesToApply)
         .eq("id", jurnalId)
         .select("*, student:siswa(*)")
         .single();
 
       if (!error && data) {
+        const normalized = normalizeJurnal(data);
         const idx = fallbackJurnal.findIndex((j) => j.id === jurnalId);
         if (idx !== -1) {
-          fallbackJurnal[idx] = data as Jurnal;
-          saveFallback("jurnal", fallbackJurnal);
+          if (!normalized.student && fallbackJurnal[idx].student) {
+            normalized.student = fallbackJurnal[idx].student;
+          }
+          fallbackJurnal[idx] = normalized;
+        } else {
+          fallbackJurnal.unshift(normalized);
         }
+        saveFallback("jurnal", fallbackJurnal);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("simmas_jurnal_updated"));
         }
         await logAudit("JURNAL_UPDATED", jurnalId, "INFO");
-        return data as Jurnal;
+        return normalized;
+      }
+      if (error) {
+        console.warn("Update jurnal live error:", error);
       }
     } catch (e) {
       console.warn("Update jurnal live error:", e);
@@ -2273,9 +2608,16 @@ export async function updateJurnalSiswa(
   const index = fallbackJurnal.findIndex((j) => j.id === jurnalId);
   if (index === -1) return null;
 
-  fallbackJurnal[index].activity = activity;
-  fallbackJurnal[index].status = "Pending";
-  fallbackJurnal[index].updated_at = new Date().toISOString();
+  fallbackJurnal[index] = {
+    ...fallbackJurnal[index],
+    activity,
+    ...(date !== undefined ? { date } : {}),
+    ...(kendala !== undefined ? { kendala } : {}),
+    ...(tindak_lanjut !== undefined ? { tindak_lanjut } : {}),
+    ...(photo_url !== undefined ? { photo_url } : {}),
+    status: "Pending",
+    updated_at: new Date().toISOString(),
+  };
   saveFallback("jurnal", fallbackJurnal);
 
   if (typeof window !== "undefined") {
@@ -2283,5 +2625,56 @@ export async function updateJurnalSiswa(
   }
   await logAudit("JURNAL_UPDATED", jurnalId, "INFO");
   return fallbackJurnal[index];
+}
+
+export async function deleteJurnalSiswa(jurnalId: string): Promise<boolean> {
+  const index = fallbackJurnal.findIndex((j) => j.id === jurnalId);
+  if (index !== -1) {
+    if (fallbackJurnal[index].status === "Perlu Revisi") {
+      throw new Error("Jurnal berstatus 'Revisi' tidak dapat dihapus, hanya dapat diedit.");
+    }
+    if (fallbackJurnal[index].status === "Disetujui") {
+      throw new Error("Jurnal yang telah terverifikasi tidak dapat dihapus.");
+    }
+  }
+
+  if (isLiveSupabase()) {
+    try {
+      if (index === -1) {
+        const { data: existing } = await supabase
+          .from("jurnal")
+          .select("status")
+          .eq("id", jurnalId)
+          .maybeSingle();
+        if (existing) {
+          if (existing.status === "Perlu Revisi") {
+            throw new Error("Jurnal berstatus 'Revisi' tidak dapat dihapus, hanya dapat diedit.");
+          }
+          if (existing.status === "Disetujui") {
+            throw new Error("Jurnal yang telah terverifikasi tidak dapat dihapus.");
+          }
+        }
+      }
+
+      const { error } = await supabase.from("jurnal").delete().eq("id", jurnalId);
+      if (error) {
+        console.warn("Delete jurnal live error:", error);
+      }
+    } catch (e: any) {
+      if (e?.message?.includes("tidak dapat dihapus")) {
+        throw e;
+      }
+      console.warn("Delete jurnal live error:", e);
+    }
+  }
+
+  fallbackJurnal = fallbackJurnal.filter((j) => j.id !== jurnalId);
+  saveFallback("jurnal", fallbackJurnal);
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("simmas_jurnal_updated"));
+  }
+  await logAudit("JURNAL_DELETED", jurnalId, "INFO");
+  return true;
 }
 

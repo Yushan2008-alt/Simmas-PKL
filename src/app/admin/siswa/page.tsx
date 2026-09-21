@@ -62,7 +62,7 @@ export default function DataSiswaPage() {
   const [formData, setFormData] = React.useState({
     name: "",
     nis: "",
-    class_name: "XII RPL 1",
+    class_name: "",
   });
 
   // Plotting form state
@@ -98,6 +98,8 @@ export default function DataSiswaPage() {
       setPenempatanList(pData);
       setDudiList(dData);
       setGuruList(gData);
+    } catch (e) {
+      toast.error("Gagal memuat data master");
     } finally {
       setLoading(false);
     }
@@ -107,22 +109,18 @@ export default function DataSiswaPage() {
     loadData();
   }, [loadData]);
 
+  // Realtime updates
   useRealtimeTable("siswa", loadData);
   useRealtimeTable("penempatan", loadData);
-  useRealtimeTable("dudi", loadData);
-  useRealtimeTable("guru", loadData);
 
-  // Only active teachers & verified DUDI
-  const activeTeachers = React.useMemo(
-    () => guruList.filter((g) => g.status === "Aktif"),
-    [guruList]
-  );
-  const verifiedDudi = React.useMemo(
-    () => dudiList.filter((d) => d.status === "Terverifikasi"),
-    [dudiList]
-  );
+  const activeTeachers = React.useMemo(() => {
+    return guruList.filter((g) => g.status === "Aktif");
+  }, [guruList]);
 
-  // Distinct class list
+  const verifiedDudi = React.useMemo(() => {
+    return dudiList.filter((d) => d.status === "Terverifikasi");
+  }, [dudiList]);
+
   const classOptions = React.useMemo(() => {
     const set = new Set<string>();
     siswaList.forEach((s) => {
@@ -140,7 +138,7 @@ export default function DataSiswaPage() {
     } else if (formData.nis.length < 4) {
       errs.nis = "NIS minimal 4 karakter/digit";
     }
-    if (!formData.class_name.trim()) errs.class_name = "Kelas wajib dipilih";
+    if (!formData.class_name.trim()) errs.class_name = "Kelas wajib diisi (Contoh: XII RPL 1)";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -149,7 +147,7 @@ export default function DataSiswaPage() {
     setFormData({
       name: "",
       nis: "",
-      class_name: "XII RPL 1",
+      class_name: "",
     });
     setErrors({});
     setIsAddOpen(true);
@@ -567,7 +565,7 @@ export default function DataSiswaPage() {
 
       {/* MODAL 1: TAMBAH SISWA (Hanya Nama, NIS, Kelas) */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <div>
@@ -605,7 +603,7 @@ export default function DataSiswaPage() {
                 </label>
                 <Input
                   id="input-siswa-nis"
-                  placeholder="21221001"
+                  placeholder="Contoh: 21221001"
                   value={formData.nis}
                   onChange={(e) => setFormData({ ...formData, nis: e.target.value })}
                   className={errors.nis ? "border-red-500" : ""}
@@ -617,19 +615,14 @@ export default function DataSiswaPage() {
                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                   Kelas *
                 </label>
-                <select
-                  id="select-siswa-kelas"
+                <Input
+                  id="input-siswa-kelas"
+                  placeholder="Contoh: XII RPL 1"
                   value={formData.class_name}
                   onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
-                  className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-foreground outline-none"
-                >
-                  <option value="XII RPL 1">XII RPL 1</option>
-                  <option value="XII RPL 2">XII RPL 2</option>
-                  <option value="XII TKJ 1">XII TKJ 1</option>
-                  <option value="XII TKJ 2">XII TKJ 2</option>
-                  <option value="XII DKV 1">XII DKV 1</option>
-                  <option value="XII AKL 1">XII AKL 1</option>
-                </select>
+                  className={errors.class_name ? "border-red-500" : ""}
+                />
+                {errors.class_name && <p className="text-[11px] text-red-500 mt-1">{errors.class_name}</p>}
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
@@ -652,7 +645,7 @@ export default function DataSiswaPage() {
 
       {/* MODAL 2: EDIT SISWA (Hanya Nama, NIS, Kelas) */}
       {isEditOpen && activeSiswa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <div>
@@ -696,18 +689,14 @@ export default function DataSiswaPage() {
                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                   Kelas *
                 </label>
-                <select
+                <Input
+                  id="edit-input-siswa-kelas"
+                  placeholder="Contoh: XII RPL 1"
                   value={formData.class_name}
                   onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
-                  className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-foreground outline-none"
-                >
-                  <option value="XII RPL 1">XII RPL 1</option>
-                  <option value="XII RPL 2">XII RPL 2</option>
-                  <option value="XII TKJ 1">XII TKJ 1</option>
-                  <option value="XII TKJ 2">XII TKJ 2</option>
-                  <option value="XII DKV 1">XII DKV 1</option>
-                  <option value="XII AKL 1">XII AKL 1</option>
-                </select>
+                  className={errors.class_name ? "border-red-500" : ""}
+                />
+                {errors.class_name && <p className="text-[11px] text-red-500 mt-1">{errors.class_name}</p>}
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
@@ -730,7 +719,7 @@ export default function DataSiswaPage() {
 
       {/* MODAL 3: PLOT GURU PEMBIMBING & TEMPAT MAGANG TERVERIFIKASI */}
       {isPlottingOpen && activeSiswa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <div>
@@ -829,7 +818,7 @@ export default function DataSiswaPage() {
 
       {/* MODAL 4: UBAH STATUS MAGANG (Belum Magang, Sedang Magang, Lulus) */}
       {isStatusOpen && activeSiswa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <div>
@@ -884,7 +873,7 @@ export default function DataSiswaPage() {
 
       {/* MODAL 5: HAPUS KONFIRMASI */}
       {isDeleteOpen && activeSiswa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-3 text-red-600 mb-3">
               <div className="p-2.5 rounded-full bg-red-100">
@@ -923,7 +912,7 @@ export default function DataSiswaPage() {
 
       {/* MODAL 6: KREDENSIAL BARU */}
       {isCredentialOpen && createdCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-2.5 text-emerald-600 mb-3">
               <div className="p-2 rounded-full bg-emerald-100">

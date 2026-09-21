@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, ExternalLink, Radio, LogOut, ChevronDown, Sparkles, GraduationCap } from "lucide-react";
+import { Menu, LogOut, ChevronDown, Sparkles, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getActiveSiswa, getDefaultSiswa, logoutUser } from "@/lib/supabase/services";
 import { toast } from "sonner";
@@ -24,11 +24,13 @@ export function SiswaHeader({ onOpenMobileMenu }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const current = pageTitles[pathname] || { title: "Portal Siswa", category: "SIMMAS" };
-  const [siswa, setSiswa] = React.useState(() => getActiveSiswa());
+  const [mounted, setMounted] = React.useState(false);
+  const [siswa, setSiswa] = React.useState(() => getDefaultSiswa());
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    setMounted(true);
     setSiswa(getActiveSiswa());
 
     const handleSiswaUpdate = () => setSiswa(getActiveSiswa());
@@ -97,22 +99,6 @@ export function SiswaHeader({ onOpenMobileMenu }: HeaderProps) {
 
       {/* Right Actions */}
       <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Realtime Status Pill */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-          <Radio className="h-2.5 w-2.5 animate-pulse text-emerald-500" />
-          <span>REAL-TIME AKTIF</span>
-        </div>
-
-        {/* View Landing */}
-        <Link
-          href="/"
-          target="_blank"
-          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          <span>Lihat Web</span>
-        </Link>
-
         {/* Interactive Student Account Badge & Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
@@ -124,19 +110,16 @@ export function SiswaHeader({ onOpenMobileMenu }: HeaderProps) {
             aria-expanded={dropdownOpen}
             aria-label="Menu Akun Siswa"
           >
-            <div
-              suppressHydrationWarning
-              className="h-8 w-8 rounded-xl bg-purple-600/10 text-purple-600 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs"
-            >
-              {studentInitials}
+            <div className="h-8 w-8 rounded-xl bg-purple-600/10 text-purple-600 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs">
+              {mounted ? studentInitials : "S"}
             </div>
 
             <div className="hidden md:block text-left min-w-0 max-w-[140px]">
-              <p suppressHydrationWarning className="text-xs font-bold text-foreground leading-tight truncate">
-                {siswa.name}
+              <p className="text-xs font-bold text-foreground leading-tight truncate">
+                {mounted ? siswa.name : "Memuat..."}
               </p>
-              <p suppressHydrationWarning className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
-                {siswa.class_name}
+              <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
+                {mounted ? siswa.class_name : "-"}
               </p>
             </div>
 
@@ -153,22 +136,18 @@ export function SiswaHeader({ onOpenMobileMenu }: HeaderProps) {
             <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-border bg-card p-3 shadow-xl z-50 animate-in fade-in-0 zoom-in-95 duration-150">
               {/* Account Profile Details */}
               <div className="flex items-start gap-3 p-2.5 rounded-xl bg-muted/40 mb-2">
-                <div
-                  suppressHydrationWarning
-                  className="h-10 w-10 rounded-xl bg-purple-600/15 text-purple-600 flex items-center justify-center font-extrabold text-sm shrink-0"
-                >
+                <div className="h-10 w-10 rounded-xl bg-purple-600/15 text-purple-600 flex items-center justify-center font-extrabold text-sm shrink-0">
                   {studentInitials}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p suppressHydrationWarning className="text-xs font-extrabold text-foreground truncate">
+                  <p className="text-xs font-extrabold text-foreground truncate">
                     {siswa.name}
                   </p>
-                  <p suppressHydrationWarning className="text-[11px] text-muted-foreground truncate mt-0.5">
+                  <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {siswa.email}
                   </p>
                   <div className="flex items-center gap-1.5 mt-1.5">
                     <span
-                      suppressHydrationWarning
                       className={cn(
                         "px-1.5 py-0.5 rounded text-[9px] font-extrabold",
                         isSedangMagang
@@ -178,7 +157,7 @@ export function SiswaHeader({ onOpenMobileMenu }: HeaderProps) {
                     >
                       {siswa.status}
                     </span>
-                    <span suppressHydrationWarning className="text-[10px] font-medium text-muted-foreground">
+                    <span className="text-[10px] font-medium text-muted-foreground">
                       NIS: {siswa.nis}
                     </span>
                   </div>
@@ -188,7 +167,7 @@ export function SiswaHeader({ onOpenMobileMenu }: HeaderProps) {
               {/* Class Information */}
               <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center justify-between border-b border-border/60 pb-2 mb-1.5">
                 <span className="text-[11px] font-medium">Kelas / Rombel</span>
-                <span suppressHydrationWarning className="text-[11px] font-bold text-foreground">
+                <span className="text-[11px] font-bold text-foreground">
                   {siswa.class_name}
                 </span>
               </div>

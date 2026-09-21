@@ -25,6 +25,7 @@ import {
   getAbsensiList,
   checkInSiswa,
   checkOutSiswa,
+  revisiAbsensiSiswa,
   getStudentPlacement,
 } from "@/lib/supabase/services";
 import { Siswa, Absensi, Penempatan } from "@/types/database";
@@ -40,7 +41,8 @@ export default function SiswaAbsensiPage() {
   // Camera modal state
   const [cameraModal, setCameraModal] = React.useState<{
     isOpen: boolean;
-    type: "DATANG" | "PULANG";
+    type: "DATANG" | "PULANG" | "REVISI_DATANG" | "REVISI_PULANG";
+    targetAbsensiId?: string;
   }>({ isOpen: false, type: "DATANG" });
 
   const [previewPhoto, setPreviewPhoto] = React.useState<string | null>(null);
@@ -91,15 +93,26 @@ export default function SiswaAbsensiPage() {
         toast.success("Presensi Datang Berhasil Disimpan!", {
           description: "Foto bukti kehadiran webcam dan jam masuk telah tersimpan.",
         });
-      } else {
+      } else if (cameraModal.type === "PULANG") {
         await checkOutSiswa(siswa.id, photoBase64);
         toast.success("Presensi Pulang Berhasil Disimpan!", {
           description: "Foto bukti kepulangan webcam dan jam pulang telah tersimpan.",
         });
+      } else if (cameraModal.type === "REVISI_DATANG" || cameraModal.type === "REVISI_PULANG") {
+        const absId = cameraModal.targetAbsensiId || todayAbsensi?.id;
+        if (!absId) throw new Error("ID presensi tidak ditemukan");
+        await revisiAbsensiSiswa(
+          absId,
+          photoBase64,
+          cameraModal.type === "REVISI_DATANG" ? "DATANG" : "PULANG"
+        );
+        toast.success("Foto Presensi Berhasil Direvisi!", {
+          description: "Foto baru telah tersimpan dan status verifikasi direset ke 'Menunggu'.",
+        });
       }
       loadData();
     } catch (e: any) {
-      toast.error("Gagal mencatat presensi", {
+      toast.error("Gagal mencatat atau merevisi presensi", {
         description: e?.message || "Terjadi kesalahan.",
       });
     }
@@ -207,6 +220,69 @@ export default function SiswaAbsensiPage() {
       ) : (
         /* UNLOCKED ACTIVE STATE */
         <div className="space-y-8">
+          {/* Alert Banner Perlu Revisi */}
+          {(todayAbsensi?.validation_status === "Perlu Revisi" || todayAbsensi?.validation_status === "Ditolak") && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-500/10 p-5 shadow-2xs animate-in fade-in-50 duration-200">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <h4 className="text-sm font-bold text-foreground">
+                      Presensi Memerlukan Revisi Foto
+                    </h4>
+                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full self-start border border-amber-300">
+                      Status: Perlu Revisi
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {todayAbsensi.validation_notes ? (
+                      <span>
+                        <strong className="text-foreground">Catatan Guru Pembimbing:</strong> &ldquo;{todayAbsensi.validation_notes}&rdquo;
+                      </span>
+                    ) : (
+                      <span>Foto bukti presensi Anda kurang jelas / buram. Silakan ambil ulang foto selfie Anda melalui tombol di bawah.</span>
+                    )}
+                  </p>
+                  <div className="pt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        setCameraModal({
+                          isOpen: true,
+                          type: "REVISI_DATANG",
+                          targetAbsensiId: todayAbsensi.id,
+                        })
+                      }
+                      className="rounded-xl px-3.5 h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>Ambil Ulang Foto Masuk</span>
+                    </Button>
+                    {todayAbsensi.check_out_time && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setCameraModal({
+                            isOpen: true,
+                            type: "REVISI_PULANG",
+                            targetAbsensiId: todayAbsensi.id,
+                          })
+                        }
+                        className="rounded-xl px-3.5 h-8 text-xs font-bold border-amber-300 text-amber-800 hover:bg-amber-100 dark:text-amber-200 gap-1.5"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        <span>Ambil Ulang Foto Pulang</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Today's Dual Attendance Action Card (Datang & Pulang) */}
           <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -252,29 +328,63 @@ export default function SiswaAbsensiPage() {
                 </div>
 
                 {todayAbsensi?.check_in_time ? (
-                  <div className="p-3 rounded-xl bg-background border border-border flex items-center gap-3">
-                    {todayAbsensi.check_in_photo ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={todayAbsensi.check_in_photo}
-                        alt="Foto Datang"
-                        title="Klik untuk memperbesar"
-                        onClick={() => setPreviewPhoto(todayAbsensi.check_in_photo || null)}
-                        className="h-10 w-10 rounded-lg object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                        <ImageIcon className="h-5 w-5" />
+                  <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {todayAbsensi.check_in_photo ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={todayAbsensi.check_in_photo}
+                          alt="Foto Datang"
+                          title="Klik untuk memperbesar"
+                          onClick={() => setPreviewPhoto(todayAbsensi.check_in_photo || null)}
+                          className="h-10 w-10 rounded-lg object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs font-bold text-foreground">
+                          Jam Masuk: {todayAbsensi.check_in_time}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Status Validasi:{" "}
+                          <span
+                            className={`font-semibold ${
+                              todayAbsensi.validation_status === "Perlu Revisi" ||
+                              todayAbsensi.validation_status === "Ditolak"
+                                ? "text-amber-600 dark:text-amber-400"
+                                : todayAbsensi.validation_status === "Disetujui"
+                                ? "text-emerald-600"
+                                : "text-blue-600"
+                            }`}
+                          >
+                            {todayAbsensi.validation_status === "Ditolak"
+                              ? "Perlu Revisi"
+                              : todayAbsensi.validation_status || "Menunggu"}
+                          </span>
+                        </p>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-xs font-bold text-foreground">
-                        Jam Masuk: {todayAbsensi.check_in_time}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Status: <span className="font-semibold text-emerald-600">Hadir Tepat Waktu</span>
-                      </p>
                     </div>
+
+                    {(todayAbsensi.validation_status === "Perlu Revisi" ||
+                      todayAbsensi.validation_status === "Ditolak") && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          setCameraModal({
+                            isOpen: true,
+                            type: "REVISI_DATANG",
+                            targetAbsensiId: todayAbsensi.id,
+                          })
+                        }
+                        className="rounded-xl px-3 h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 gap-1"
+                      >
+                        <Camera className="h-3 w-3" />
+                        <span>Revisi Foto</span>
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -317,29 +427,63 @@ export default function SiswaAbsensiPage() {
                 </div>
 
                 {todayAbsensi?.check_out_time ? (
-                  <div className="p-3 rounded-xl bg-background border border-border flex items-center gap-3">
-                    {todayAbsensi.check_out_photo ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={todayAbsensi.check_out_photo}
-                        alt="Foto Pulang"
-                        title="Klik untuk memperbesar"
-                        onClick={() => setPreviewPhoto(todayAbsensi.check_out_photo || null)}
-                        className="h-10 w-10 rounded-lg object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                        <ImageIcon className="h-5 w-5" />
+                  <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {todayAbsensi.check_out_photo ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={todayAbsensi.check_out_photo}
+                          alt="Foto Pulang"
+                          title="Klik untuk memperbesar"
+                          onClick={() => setPreviewPhoto(todayAbsensi.check_out_photo || null)}
+                          className="h-10 w-10 rounded-lg object-cover border border-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs font-bold text-foreground">
+                          Jam Pulang: {todayAbsensi.check_out_time}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Status Validasi:{" "}
+                          <span
+                            className={`font-semibold ${
+                              todayAbsensi.validation_status === "Perlu Revisi" ||
+                              todayAbsensi.validation_status === "Ditolak"
+                                ? "text-amber-600 dark:text-amber-400"
+                                : todayAbsensi.validation_status === "Disetujui"
+                                ? "text-emerald-600"
+                                : "text-blue-600"
+                            }`}
+                          >
+                            {todayAbsensi.validation_status === "Ditolak"
+                              ? "Perlu Revisi"
+                              : todayAbsensi.validation_status || "Menunggu"}
+                          </span>
+                        </p>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-xs font-bold text-foreground">
-                        Jam Pulang: {todayAbsensi.check_out_time}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Status: <span className="font-semibold text-blue-600">Selesai Hari Kerja</span>
-                      </p>
                     </div>
+
+                    {(todayAbsensi.validation_status === "Perlu Revisi" ||
+                      todayAbsensi.validation_status === "Ditolak") && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          setCameraModal({
+                            isOpen: true,
+                            type: "REVISI_PULANG",
+                            targetAbsensiId: todayAbsensi.id,
+                          })
+                        }
+                        className="rounded-xl px-3 h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 gap-1"
+                      >
+                        <Camera className="h-3 w-3" />
+                        <span>Revisi Foto</span>
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -381,92 +525,146 @@ export default function SiswaAbsensiPage() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                    <th className="px-6 py-3.5">Tanggal</th>
-                    <th className="px-4 py-3.5 text-center">Status</th>
-                    <th className="px-6 py-3.5">Presensi Datang</th>
-                    <th className="px-6 py-3.5">Presensi Pulang</th>
-                    <th className="px-6 py-3.5">Keterangan</th>
+                    <th className="px-5 py-3.5">Tanggal</th>
+                    <th className="px-3 py-3.5 text-center">Status</th>
+                    <th className="px-5 py-3.5">Presensi Datang</th>
+                    <th className="px-5 py-3.5">Presensi Pulang</th>
+                    <th className="px-4 py-3.5 text-center">Validasi</th>
+                    <th className="px-4 py-3.5 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {history.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                      <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                         Belum ada riwayat presensi tercatat.
                       </td>
                     </tr>
                   ) : (
-                    history.map((a) => (
-                      <tr key={a.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3.5 font-bold text-foreground">
-                          {a.date}
-                        </td>
+                    history.map((a) => {
+                      const valStatus =
+                        a.validation_status ||
+                        (a.status === "Sakit" || a.status === "Izin"
+                          ? "Menunggu"
+                          : a.status === "Alfa"
+                          ? "Perlu Revisi"
+                          : "Disetujui");
+                      const isValApproved = valStatus === "Disetujui";
+                      const isValRevision = valStatus === "Perlu Revisi" || valStatus === "Ditolak";
 
-                        <td className="px-4 py-3.5 text-center">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              a.status === "Hadir"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : a.status === "Sakit"
-                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                : a.status === "Izin"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-red-50 text-red-700 border border-red-200"
-                            }`}
-                          >
-                            {a.status}
-                          </span>
-                        </td>
+                      return (
+                        <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-foreground">
+                            {a.date}
+                          </td>
 
-                        <td className="px-6 py-3.5">
-                          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/80">
-                            {a.check_in_photo ? (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={a.check_in_photo}
-                                alt="Foto Masuk"
-                                title="Klik untuk memperbesar"
-                                onClick={() => setPreviewPhoto(a.check_in_photo || null)}
-                                className="h-6 w-6 rounded-md object-cover border border-border cursor-pointer hover:scale-110 transition-transform shadow-2xs shrink-0"
-                              />
-                            ) : (
-                              <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground/60 shrink-0">
-                                <ImageIcon className="h-3 w-3" />
-                              </div>
-                            )}
-                            <span className="font-semibold text-foreground text-[11px]">
-                              {a.check_in_time || "-"}
+                          <td className="px-3 py-3.5 text-center">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                a.status === "Hadir"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : a.status === "Sakit"
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : a.status === "Izin"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-red-50 text-red-700 border border-red-200"
+                              }`}
+                            >
+                              {a.status}
                             </span>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td className="px-6 py-3.5">
-                          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/80">
-                            {a.check_out_photo ? (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={a.check_out_photo}
-                                alt="Foto Pulang"
-                                title="Klik untuk memperbesar"
-                                onClick={() => setPreviewPhoto(a.check_out_photo || null)}
-                                className="h-6 w-6 rounded-md object-cover border border-border cursor-pointer hover:scale-110 transition-transform shadow-2xs shrink-0"
-                              />
+                          <td className="px-5 py-3.5">
+                            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/80">
+                              {a.check_in_photo ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={a.check_in_photo}
+                                  alt="Foto Masuk"
+                                  title="Klik untuk memperbesar"
+                                  onClick={() => setPreviewPhoto(a.check_in_photo || null)}
+                                  className="h-6 w-6 rounded-md object-cover border border-border cursor-pointer hover:scale-110 transition-transform shadow-2xs shrink-0"
+                                />
+                              ) : (
+                                <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground/60 shrink-0">
+                                  <ImageIcon className="h-3 w-3" />
+                                </div>
+                              )}
+                              <span className="font-semibold text-foreground text-[11px]">
+                                {a.check_in_time || "-"}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-3.5">
+                            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/40 border border-border/80">
+                              {a.check_out_photo ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={a.check_out_photo}
+                                  alt="Foto Pulang"
+                                  title="Klik untuk memperbesar"
+                                  onClick={() => setPreviewPhoto(a.check_out_photo || null)}
+                                  className="h-6 w-6 rounded-md object-cover border border-border cursor-pointer hover:scale-110 transition-transform shadow-2xs shrink-0"
+                                />
+                              ) : (
+                                <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground/60 shrink-0">
+                                  <ImageIcon className="h-3 w-3" />
+                                </div>
+                              )}
+                              <span className="font-semibold text-foreground text-[11px]">
+                                {a.check_out_time || "-"}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  isValApproved
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : isValRevision
+                                    ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40"
+                                    : "bg-blue-50 text-blue-700 border-blue-200"
+                                }`}
+                              >
+                                {isValRevision ? "Perlu Revisi" : valStatus}
+                              </span>
+                              {a.validation_notes && isValRevision && (
+                                <span
+                                  className="text-[10px] text-amber-600 dark:text-amber-400 font-medium max-w-[140px] truncate"
+                                  title={a.validation_notes}
+                                >
+                                  {a.validation_notes}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right">
+                            {isValRevision ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setCameraModal({
+                                    isOpen: true,
+                                    type: "REVISI_DATANG",
+                                    targetAbsensiId: a.id,
+                                  })
+                                }
+                                className="h-7 px-2.5 rounded-lg text-[11px] font-bold border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700"
+                              >
+                                Revisi Foto
+                              </Button>
                             ) : (
-                              <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground/60 shrink-0">
-                                <ImageIcon className="h-3 w-3" />
-                              </div>
+                              <span className="text-muted-foreground text-[11px]">-</span>
                             )}
-                            <span className="font-semibold text-foreground text-[11px]">
-                              {a.check_out_time || "-"}
-                            </span>
-                          </div>
-                        </td>
-
-                        <td className="px-6 py-3.5 text-muted-foreground">
-                          {a.notes || "-"}
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -478,8 +676,20 @@ export default function SiswaAbsensiPage() {
       {/* Camera Capture Modal */}
       <CameraCaptureModal
         isOpen={cameraModal.isOpen}
-        title={cameraModal.type === "DATANG" ? "Presensi Datang (Webcam)" : "Presensi Pulang (Webcam)"}
-        subtitle="Ambil foto selfie langsung di depan kamera sebagai bukti absensi autentik"
+        title={
+          cameraModal.type === "REVISI_DATANG"
+            ? "Revisi Foto Presensi Datang"
+            : cameraModal.type === "REVISI_PULANG"
+            ? "Revisi Foto Presensi Pulang"
+            : cameraModal.type === "DATANG"
+            ? "Presensi Datang (Webcam)"
+            : "Presensi Pulang (Webcam)"
+        }
+        subtitle={
+          cameraModal.type === "REVISI_DATANG" || cameraModal.type === "REVISI_PULANG"
+            ? "Ambil ulang foto selfie bukti kehadiran yang jelas sesuai arahan guru pembimbing"
+            : "Ambil foto selfie langsung di depan kamera sebagai bukti absensi autentik"
+        }
         onClose={() => setCameraModal({ isOpen: false, type: "DATANG" })}
         onCaptureConfirm={handleCameraCapture}
       />
@@ -487,7 +697,7 @@ export default function SiswaAbsensiPage() {
       {/* Photo Preview Modal */}
       {previewPhoto && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
           onClick={() => setPreviewPhoto(null)}
         >
           <div className="relative max-w-lg w-full bg-card rounded-3xl overflow-hidden p-4 space-y-3">

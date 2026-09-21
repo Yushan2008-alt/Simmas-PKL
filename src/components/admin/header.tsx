@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Menu,
   Bell,
-  ExternalLink,
   Shield,
   LogOut,
   ChevronDown,
@@ -83,22 +82,6 @@ export function AdminHeader({ onOpenMobileMenu }: HeaderProps) {
 
       {/* Right Actions */}
       <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Realtime Status Pill */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Realtime Live</span>
-        </div>
-
-        {/* View Landing Page link */}
-        <Link
-          href="/"
-          target="_blank"
-          className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <span>Landing Page</span>
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Link>
-
         {/* Notification Bell */}
         <button
           className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"

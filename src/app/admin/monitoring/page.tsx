@@ -359,7 +359,7 @@ export default function MonitoringGlobalPage() {
 
       {/* MODAL DETAIL SISWA MAGANG */}
       {selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-lg rounded-2xl border border-border bg-background shadow-2xl p-6 animate-in fade-in zoom-in-95 space-y-5">
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-3 border-b border-border">

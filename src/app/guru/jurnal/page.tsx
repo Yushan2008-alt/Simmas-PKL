@@ -2,43 +2,46 @@
 
 import * as React from "react";
 import {
-  ClipboardCheck,
+  BookOpen,
   Search,
   CheckCircle2,
   AlertCircle,
   Clock,
+  XCircle,
   MessageSquare,
-  Calendar,
-  User,
-  Users,
-  Check,
-  TrendingUp,
+  Image as ImageIcon,
+  X,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   getActiveGuru,
-  getDefaultGuru,
   getJurnalList,
-  validateJurnal,
-  getSupervisedStudentsSummary,
-  SupervisedStudentSummary,
+  getAbsensiList,
 } from "@/lib/supabase/services";
-import { Guru, Jurnal, JurnalStatus } from "@/types/database";
-import { RevisiJurnalModal } from "@/components/guru/revisi-jurnal-modal";
+import { Guru, Jurnal, Absensi } from "@/types/database";
+import { ValidasiJurnalModal } from "@/components/guru/revisi-jurnal-modal";
+import { ValidasiAbsensiModal } from "@/components/guru/validasi-absensi-modal";
 
 export default function GuruJurnalPage() {
   const [guru, setGuru] = React.useState<Guru>(() => getActiveGuru());
-  const [activeTab, setActiveTab] = React.useState<"jurnal" | "presensi">("jurnal");
+  const [activeTab, setActiveTab] = React.useState<"jurnal" | "absensi">("jurnal");
   const [jurnals, setJurnals] = React.useState<Jurnal[]>([]);
-  const [summaries, setSummaries] = React.useState<SupervisedStudentSummary[]>([]);
+  const [absensis, setAbsensis] = React.useState<Absensi[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
 
-  // Modal revisi
-  const [revisiJurnal, setRevisiJurnal] = React.useState<Jurnal | null>(null);
+  // Search input
+  const [searchJurnal, setSearchJurnal] = React.useState("");
+  const [searchAbsensi, setSearchAbsensi] = React.useState("");
+
+  // Modals state
+  const [validasiJurnal, setValidasiJurnal] = React.useState<Jurnal | null>(null);
+  const [validasiAbsensi, setValidasiAbsensi] = React.useState<Absensi | null>(null);
+  const [previewPhoto, setPreviewPhoto] = React.useState<{
+    url: string;
+    title: string;
+  } | null>(null);
 
   const loadData = React.useCallback(async () => {
     const currentGuru = getActiveGuru();
@@ -49,14 +52,14 @@ export default function GuruJurnalPage() {
     }
 
     try {
-      const [jList, sumList] = await Promise.all([
+      const [jList, aList] = await Promise.all([
         getJurnalList({ teacherId: currentGuru.id }),
-        getSupervisedStudentsSummary(currentGuru.id),
+        getAbsensiList({ teacherId: currentGuru.id }),
       ]);
       setJurnals(jList);
-      setSummaries(sumList);
+      setAbsensis(aList);
     } catch (e) {
-      console.error("Failed to load jurnal data:", e);
+      console.error("Failed to load jurnal/absensi data:", e);
     } finally {
       setLoading(false);
     }
@@ -67,384 +70,382 @@ export default function GuruJurnalPage() {
 
     const handleAuthChange = () => loadData();
     const handleJurnalUpdate = () => loadData();
+    const handleAbsensiUpdate = () => loadData();
     const handlePenempatanUpdate = () => loadData();
 
     if (typeof window !== "undefined") {
       window.addEventListener("simmas_auth_changed", handleAuthChange);
       window.addEventListener("simmas_jurnal_updated", handleJurnalUpdate);
+      window.addEventListener("simmas_absensi_updated", handleAbsensiUpdate);
       window.addEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       return () => {
         window.removeEventListener("simmas_auth_changed", handleAuthChange);
         window.removeEventListener("simmas_jurnal_updated", handleJurnalUpdate);
+        window.removeEventListener("simmas_absensi_updated", handleAbsensiUpdate);
         window.removeEventListener("simmas_penempatan_updated", handlePenempatanUpdate);
       };
     }
   }, [loadData]);
 
-  const handleApprove = async (jurnal: Jurnal) => {
+  // Helper date formatter: "20 Sep 2026"
+  const formatDateDisplay = (dateString?: string) => {
+    if (!dateString) return "-";
     try {
-      await validateJurnal(jurnal.id, "Disetujui");
-      toast.success("Jurnal disetujui", {
-        description: `Laporan kegiatan dari ${jurnal.student?.name} telah diverifikasi.`,
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return dateString;
+      return d.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
       });
-      loadData();
-    } catch (e: any) {
-      toast.error("Gagal menyetujui jurnal", {
-        description: e?.message || "Terjadi kesalahan.",
-      });
+    } catch {
+      return dateString;
     }
   };
 
-  // Filtered journals
-  const filteredJurnals = jurnals.filter((j) => {
-    const matchSearch =
-      (j.student?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-      j.activity.toLowerCase().includes(search.toLowerCase());
+  // Filtered lists
+  const filteredJurnals = React.useMemo(() => {
+    const q = searchJurnal.toLowerCase().trim();
+    if (!q) return jurnals;
+    return jurnals.filter(
+      (j) =>
+        (j.student?.name || "").toLowerCase().includes(q) ||
+        (j.activity || "").toLowerCase().includes(q)
+    );
+  }, [jurnals, searchJurnal]);
 
-    const matchStatus =
-      statusFilter === "ALL" ||
-      (statusFilter === "Pending" && j.status === "Pending") ||
-      (statusFilter === "Disetujui" && j.status === "Disetujui") ||
-      (statusFilter === "Perlu Revisi" && j.status === "Perlu Revisi");
+  const filteredAbsensis = React.useMemo(() => {
+    const q = searchAbsensi.toLowerCase().trim();
+    if (!q) return absensis;
+    return absensis.filter(
+      (a) =>
+        (a.student?.name || "").toLowerCase().includes(q) ||
+        (a.status || "").toLowerCase().includes(q)
+    );
+  }, [absensis, searchAbsensi]);
 
-    return matchSearch && matchStatus;
-  });
+  // Jurnal counts
+  const jurnalPendingCount = jurnals.filter((j) => j.status === "Pending").length;
+  const jurnalApprovedCount = jurnals.filter((j) => j.status === "Disetujui").length;
+  const jurnalRevisionCount = jurnals.filter((j) => j.status === "Perlu Revisi").length;
 
-  const pendingCount = jurnals.filter((j) => j.status === "Pending").length;
-  const approvedCount = jurnals.filter((j) => j.status === "Disetujui").length;
-  const revisionCount = jurnals.filter((j) => j.status === "Perlu Revisi").length;
+  // Absensi counts
+  const absensiPendingCount = absensis.filter(
+    (a) =>
+      a.validation_status === "Menunggu" ||
+      ((a.status === "Sakit" || a.status === "Izin") && !a.validation_status)
+  ).length;
+  const absensiApprovedCount = absensis.filter(
+    (a) =>
+      a.validation_status === "Disetujui" ||
+      (a.status === "Hadir" && !a.validation_status)
+  ).length;
+  const absensiRevisionCount = absensis.filter(
+    (a) =>
+      a.validation_status === "Perlu Revisi" ||
+      a.validation_status === "Ditolak" ||
+      (a.status === "Alfa" && !a.validation_status)
+  ).length;
 
   return (
-    <div className="space-y-6 w-full">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/10 text-blue-600">
-              Monitoring & Evaluasi
-            </span>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
-            Jurnal & Absensi Siswa
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Verifikasi jurnal kegiatan harian serta tinjau rekapitulasi presensi siswa bimbingan.
-          </p>
+    <div className="space-y-6 w-full pb-10">
+      {/* Title Header (persis gambar: Icon Buku Biru Outline + Validasi Jurnal & Absensi) */}
+      <div className="flex items-center gap-3">
+        <div className="text-blue-600">
+          <BookOpen className="h-6 w-6 stroke-[2.2]" />
         </div>
-
-        {/* Tab Switcher */}
-        <div className="flex items-center p-1 bg-muted rounded-xl border border-border shrink-0">
-          <button
-            onClick={() => setActiveTab("jurnal")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "jurnal"
-                ? "bg-card text-foreground shadow-2xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <ClipboardCheck className="h-4 w-4" />
-            <span>Jurnal Kegiatan</span>
-            {pendingCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                {pendingCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("presensi")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "presensi"
-                ? "bg-card text-foreground shadow-2xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <TrendingUp className="h-4 w-4" />
-            <span>Rekap Presensi</span>
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Validasi Jurnal & Absensi
+        </h1>
       </div>
 
-      {/* TAB 1: JURNAL KEGIATAN */}
-      {activeTab === "jurnal" && (
-        <div className="space-y-6">
-          {/* Status Quick Filter Pills */}
-          {/* Search & Filter Bar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari siswa atau kegiatan jurnal..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 rounded-xl bg-card text-xs"
-              />
+      {/* 3 Stat Cards (Dinamis sesuai Tab aktif) */}
+      {activeTab === "jurnal" ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Menunggu Validasi */}
+          <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-32">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                MENUNGGU VALIDASI
+              </span>
+              <div className="h-7 w-7 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center">
+                <Clock className="h-4 w-4" />
+              </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={() => setStatusFilter("ALL")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  statusFilter === "ALL"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                }`}
-              >
-                Semua ({jurnals.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter("Pending")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  statusFilter === "Pending"
-                    ? "bg-amber-500 text-white shadow-xs"
-                    : "bg-card text-amber-600 border border-border hover:bg-amber-50"
-                }`}
-              >
-                Pending ({pendingCount})
-              </button>
-              <button
-                onClick={() => setStatusFilter("Disetujui")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  statusFilter === "Disetujui"
-                    ? "bg-emerald-600 text-white shadow-xs"
-                    : "bg-card text-emerald-600 border border-border hover:bg-emerald-50"
-                }`}
-              >
-                Disetujui ({approvedCount})
-              </button>
-              <button
-                onClick={() => setStatusFilter("Perlu Revisi")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  statusFilter === "Perlu Revisi"
-                    ? "bg-red-500 text-white shadow-xs"
-                    : "bg-card text-red-600 border border-border hover:bg-red-50"
-                }`}
-              >
-                Revisi ({revisionCount})
-              </button>
+            <div>
+              <p className="text-3xl font-extrabold text-foreground leading-none">
+                {jurnalPendingCount}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Butuh review segera
+              </p>
             </div>
           </div>
 
-          {/* Journal List */}
-          {loading ? (
-            <div className="p-12 text-center text-xs text-muted-foreground">
-              Memuat data jurnal...
+          {/* Card 2: Jurnal Disetujui */}
+          <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-32">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                JURNAL DISETUJUI
+              </span>
+              <div className="h-7 w-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
             </div>
-          ) : jurnals.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card">
-              <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-bold text-foreground">
-                Belum Ada Laporan Jurnal
+            <div>
+              <p className="text-3xl font-extrabold text-foreground leading-none">
+                {jurnalApprovedCount}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5 max-w-sm mx-auto">
-                Belum ada jurnal kegiatan dari siswa bimbingan Anda. Siswa yang telah ditempatkan akan mengirimkan laporan harian mereka ke sini.
-              </p>
-            </div>
-          ) : filteredJurnals.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card">
-              <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-bold text-foreground">
-                Tidak ada jurnal yang sesuai
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Coba sesuaikan kata kunci pencarian atau filter status Anda.
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Bulan ini
               </p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredJurnals.map((j) => {
-                const isPending = j.status === "Pending";
-                const isApproved = j.status === "Disetujui";
-                const isRevision = j.status === "Perlu Revisi";
+          </div>
 
-                return (
-                  <div
-                    key={j.id}
-                    className={`p-5 rounded-2xl border bg-card transition-all space-y-3 ${
-                      isPending
-                        ? "border-amber-300/80 shadow-xs bg-amber-500/2"
-                        : "border-border"
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
-                          {j.student?.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-sm text-foreground">
-                              {j.student?.name}
-                            </h3>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-foreground border border-border">
-                              {j.student?.class_name}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            NIS: {j.student?.nis}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {j.date}
-                        </span>
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            isApproved
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : isPending
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-red-50 text-red-700 border border-red-200"
-                          }`}
-                        >
-                          {j.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Activity Body */}
-                    <div className="p-3.5 rounded-xl bg-muted/30 border border-border/80">
-                      <p className="text-xs text-foreground leading-relaxed">
-                        {j.activity}
-                      </p>
-                    </div>
-
-                    {/* Existing Feedback Note */}
-                    {j.teacher_feedback && (
-                      <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-200 text-xs text-blue-900 dark:bg-blue-950/20 dark:border-blue-900 dark:text-blue-200 space-y-0.5">
-                        <p className="font-bold text-[11px] flex items-center gap-1.5">
-                          <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
-                          <span>Catatan Evaluasi Guru:</span>
-                        </p>
-                        <p className="pl-5 text-muted-foreground text-[11px]">
-                          {j.teacher_feedback}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border/60">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setRevisiJurnal(j)}
-                        className="h-8 text-xs font-semibold rounded-xl text-amber-700 hover:bg-amber-50 border-amber-300"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                        <span>Beri Catatan Revisi</span>
-                      </Button>
-
-                      {!isApproved && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApprove(j)}
-                          className="h-8 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                          <span>Setujui Jurnal</span>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Card 3: Perlu Revisi */}
+          <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-32">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                PERLU REVISI
+              </span>
+              <div className="h-7 w-7 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 flex items-center justify-center">
+                <AlertCircle className="h-4 w-4" />
+              </div>
             </div>
-          )}
+            <div>
+              <p className="text-3xl font-extrabold text-foreground leading-none">
+                {jurnalRevisionCount}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Menunggu perbaikan siswa
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Menunggu Validasi Absensi */}
+          <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-32">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                MENUNGGU VALIDASI
+              </span>
+              <div className="h-7 w-7 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center">
+                <Clock className="h-4 w-4" />
+              </div>
+            </div>
+            <div>
+              <p className="text-3xl font-extrabold text-foreground leading-none">
+                {absensiPendingCount}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Sakit / Izin belum ditinjau
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2: Absensi Disetujui */}
+          <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-32">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                ABSENSI DISETUJUI
+              </span>
+              <div className="h-7 w-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+            </div>
+            <div>
+              <p className="text-3xl font-extrabold text-foreground leading-none">
+                {absensiApprovedCount}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Bulan ini
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Perlu Revisi */}
+          <div className="p-5 rounded-2xl border border-border bg-card shadow-2xs flex flex-col justify-between h-32">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                PERLU REVISI
+              </span>
+              <div className="h-7 w-7 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+            </div>
+            <div>
+              <p className="text-3xl font-extrabold text-foreground leading-none">
+                {absensiRevisionCount}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Menunggu revisi foto siswa
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* TAB 2: REKAP PRESENSI */}
-      {activeTab === "presensi" && (
-        <div className="space-y-6">
+      {/* Tab Switcher Pills: [ Jurnal ] [ Absensi ] */}
+      <div className="inline-flex items-center p-1 bg-muted/60 rounded-xl border border-border/60">
+        <button
+          onClick={() => setActiveTab("jurnal")}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            activeTab === "jurnal"
+              ? "bg-card text-foreground shadow-2xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Jurnal
+        </button>
+        <button
+          onClick={() => setActiveTab("absensi")}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            activeTab === "absensi"
+              ? "bg-card text-foreground shadow-2xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Absensi
+        </button>
+      </div>
+
+      {/* TAB CONTENT: JURNAL */}
+      {activeTab === "jurnal" && (
+        <div className="space-y-4">
+          {/* Search Bar: Cari nama siswa atau kegiatan... */}
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Cari nama siswa atau kegiatan..."
+              value={searchJurnal}
+              onChange={(e) => setSearchJurnal(e.target.value)}
+              className="pl-9 h-9 text-xs rounded-xl bg-card border-border/80"
+            />
+          </div>
+
+          {/* Table Jurnal */}
           <div className="rounded-2xl border border-border bg-card shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse table-fixed">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                    <th className="px-6 py-4">Siswa Bimbingan</th>
-                    <th className="px-4 py-4">Kelas</th>
-                    <th className="px-4 py-4">Mitra DUDI</th>
-                    <th className="px-4 py-4 text-center">Hadir</th>
-                    <th className="px-4 py-4 text-center">Sakit</th>
-                    <th className="px-4 py-4 text-center">Izin</th>
-                    <th className="px-4 py-4 text-center">Alfa</th>
-                    <th className="px-6 py-4 text-center">Persentase</th>
-                    <th className="px-6 py-4 text-center">Kategori</th>
+                  <tr className="border-b border-border bg-muted/20 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-5 py-3.5 w-[22%]">TANGGAL & SISWA</th>
+                    <th className="px-5 py-3.5 w-[44%]">KEGIATAN</th>
+                    <th className="px-5 py-3.5 text-center w-[14%]">FOTO</th>
+                    <th className="px-5 py-3.5 text-center w-[12%]">STATUS</th>
+                    <th className="px-5 py-3.5 text-right w-[8%]">AKSI</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-xs">
-                  {summaries.map((s) => {
-                    const rate = s.attendanceRate;
-                    const category =
-                      rate >= 95
-                        ? "Sangat Baik"
-                        : rate >= 85
-                        ? "Baik"
-                        : rate >= 75
-                        ? "Cukup"
-                        : "Perlu Bimbingan";
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-muted-foreground text-xs">
+                        Memuat data jurnal...
+                      </td>
+                    </tr>
+                  ) : filteredJurnals.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-muted-foreground text-xs">
+                        Belum ada laporan jurnal yang sesuai.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredJurnals.map((j) => {
+                      const isApproved = j.status === "Disetujui";
+                      const isPending = j.status === "Pending";
+                      const isRevision = j.status === "Perlu Revisi";
 
-                    return (
-                      <tr key={s.student.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-foreground text-sm">
-                            {s.student.name}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            NIS: {s.student.nis}
-                          </p>
-                        </td>
+                      return (
+                        <tr key={j.id} className="hover:bg-muted/20 transition-colors">
+                          {/* 1. TANGGAL & SISWA */}
+                          <td className="px-5 py-4 align-top">
+                            <p className="font-semibold text-foreground text-xs">
+                              {formatDateDisplay(j.date)}
+                            </p>
+                            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                              {j.student?.name || "Siswa"}
+                            </p>
+                          </td>
 
-                        <td className="px-4 py-4">
-                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-muted text-foreground border border-border">
-                            {s.student.class_name}
-                          </span>
-                        </td>
+                          {/* 2. KEGIATAN */}
+                          <td className="px-5 py-4 align-top">
+                            <p className="text-xs text-foreground leading-relaxed">
+                              {j.activity}
+                            </p>
 
-                        <td className="px-4 py-4 font-medium text-foreground">
-                          {s.dudi.name}
-                        </td>
+                            {/* Catatan Evaluasi Guru oranye jika ada */}
+                            {j.teacher_feedback && (
+                              <div className="flex items-start gap-1 text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                                <MessageSquare className="h-3 w-3 shrink-0 mt-0.5" />
+                                <span>Catatan: {j.teacher_feedback}</span>
+                              </div>
+                            )}
+                          </td>
 
-                        <td className="px-4 py-4 text-center font-bold text-emerald-600">
-                          {s.hadirCount}
-                        </td>
+                          {/* 3. FOTO */}
+                          <td className="px-5 py-4 align-middle text-center">
+                            {j.photo_url ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewPhoto({
+                                    url: j.photo_url!,
+                                    title: `Foto Jurnal - ${j.student?.name} (${formatDateDisplay(j.date)})`,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 transition-colors"
+                              >
+                                <ImageIcon className="h-3 w-3" />
+                                <span>Foto</span>
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
 
-                        <td className="px-4 py-4 text-center font-semibold text-blue-600">
-                          {s.sakitCount}
-                        </td>
+                          {/* 4. STATUS */}
+                          <td className="px-5 py-4 align-middle text-center">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                isApproved
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30"
+                                  : isRevision
+                                  ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30"
+                                  : "bg-muted text-muted-foreground border-border"
+                              }`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  isApproved
+                                    ? "bg-emerald-600"
+                                    : isRevision
+                                    ? "bg-amber-600"
+                                    : "bg-muted-foreground"
+                                }`}
+                              />
+                              {isApproved
+                                ? "Disetujui"
+                                : isRevision
+                                ? "Perlu Revisi"
+                                : "Pending"}
+                            </span>
+                          </td>
 
-                        <td className="px-4 py-4 text-center font-semibold text-amber-600">
-                          {s.izinCount}
-                        </td>
-
-                        <td className="px-4 py-4 text-center font-bold text-red-600">
-                          {s.alfaCount}
-                        </td>
-
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${
-                              rate >= 90
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : rate >= 80
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-red-50 text-red-700 border border-red-200"
-                            }`}
-                          >
-                            {rate}%
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-xs font-semibold text-muted-foreground">
-                            {category}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          {/* 5. AKSI */}
+                          <td className="px-5 py-4 align-middle text-right">
+                            <button
+                              type="button"
+                              onClick={() => setValidasiJurnal(j)}
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                            >
+                              {isPending ? "Validasi" : "Ubah Validasi"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -452,13 +453,245 @@ export default function GuruJurnalPage() {
         </div>
       )}
 
-      {/* Modal Revisi */}
-      <RevisiJurnalModal
-        isOpen={!!revisiJurnal}
-        onClose={() => setRevisiJurnal(null)}
+      {/* TAB CONTENT: ABSENSI */}
+      {activeTab === "absensi" && (
+        <div className="space-y-4">
+          {/* Search Bar: Cari nama siswa... */}
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Cari nama siswa..."
+              value={searchAbsensi}
+              onChange={(e) => setSearchAbsensi(e.target.value)}
+              className="pl-9 h-9 text-xs rounded-xl bg-card border-border/80"
+            />
+          </div>
+
+          {/* Table Absensi */}
+          <div className="rounded-2xl border border-border bg-card shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse table-fixed">
+                <thead>
+                  <tr className="border-b border-border bg-muted/20 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-5 py-3.5 w-[26%]">TANGGAL & SISWA</th>
+                    <th className="px-5 py-3.5 w-[20%]">KEHADIRAN</th>
+                    <th className="px-5 py-3.5 text-center w-[24%]">FOTO</th>
+                    <th className="px-5 py-3.5 text-center w-[18%]">VALIDASI</th>
+                    <th className="px-5 py-3.5 text-right w-[12%]">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border text-xs">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-muted-foreground text-xs">
+                        Memuat data presensi...
+                      </td>
+                    </tr>
+                  ) : filteredAbsensis.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-muted-foreground text-xs">
+                        Belum ada catatan presensi yang sesuai.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAbsensis.map((a) => {
+                      const valStatus =
+                        a.validation_status ||
+                        (a.status === "Sakit" || a.status === "Izin"
+                          ? "Menunggu"
+                          : a.status === "Alfa"
+                          ? "Perlu Revisi"
+                          : "Disetujui");
+
+                      const isValApproved = valStatus === "Disetujui";
+                      const isValRevision = valStatus === "Perlu Revisi" || valStatus === "Ditolak";
+                      const isValPending = valStatus === "Menunggu";
+
+                      return (
+                        <tr key={a.id} className="hover:bg-muted/20 transition-colors">
+                          {/* 1. TANGGAL & SISWA */}
+                          <td className="px-5 py-4 align-top">
+                            <p className="font-semibold text-foreground text-xs">
+                              {formatDateDisplay(a.date)}
+                            </p>
+                            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                              {a.student?.name || "Siswa"}
+                            </p>
+                          </td>
+
+                          {/* 2. KEHADIRAN */}
+                          <td className="px-5 py-4 align-middle">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                a.status === "Hadir"
+                                   ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30"
+                                  : a.status === "Sakit"
+                                  ? "bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30"
+                                  : a.status === "Izin"
+                                  ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30"
+                                  : "bg-red-50 text-red-700 border-red-300 dark:bg-red-950/30"
+                              }`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  a.status === "Hadir"
+                                    ? "bg-emerald-600"
+                                    : a.status === "Sakit"
+                                    ? "bg-blue-600"
+                                    : a.status === "Izin"
+                                    ? "bg-amber-600"
+                                    : "bg-red-600"
+                                }`}
+                              />
+                              {a.status}
+                            </span>
+                          </td>
+
+                          {/* 3. FOTO: [ Masuk ] [ Pulang ] */}
+                          <td className="px-5 py-4 align-middle text-center">
+                            <div className="inline-flex items-center gap-2">
+                              {a.check_in_photo ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewPhoto({
+                                      url: a.check_in_photo!,
+                                      title: `Foto Presensi Masuk - ${a.student?.name} (${formatDateDisplay(a.date)})`,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 transition-colors"
+                                >
+                                  <ImageIcon className="h-3 w-3" />
+                                  <span>Masuk</span>
+                                </button>
+                              ) : null}
+
+                              {a.check_out_photo ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewPhoto({
+                                      url: a.check_out_photo!,
+                                      title: `Foto Presensi Pulang - ${a.student?.name} (${formatDateDisplay(a.date)})`,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 transition-colors"
+                                >
+                                  <ImageIcon className="h-3 w-3" />
+                                  <span>Pulang</span>
+                                </button>
+                              ) : null}
+
+                              {!a.check_in_photo && !a.check_out_photo && (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 4. VALIDASI */}
+                          <td className="px-5 py-4 align-middle text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                  isValApproved
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30"
+                                    : isValRevision
+                                    ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30"
+                                    : "bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30"
+                                }`}
+                              >
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full ${
+                                    isValApproved
+                                      ? "bg-emerald-600"
+                                      : isValRevision
+                                      ? "bg-amber-600"
+                                      : "bg-blue-600"
+                                  }`}
+                                />
+                                {valStatus === "Ditolak" ? "Perlu Revisi" : valStatus}
+                              </span>
+                              {a.validation_notes && isValRevision && (
+                                <span
+                                  className="text-[10px] text-amber-600 dark:text-amber-400 font-medium max-w-[160px] truncate"
+                                  title={a.validation_notes}
+                                >
+                                  Catatan: {a.validation_notes}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 5. AKSI */}
+                          <td className="px-5 py-4 align-middle text-right">
+                            <button
+                              type="button"
+                              onClick={() => setValidasiAbsensi(a)}
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                            >
+                              {isValPending ? "Validasi" : "Ubah Validasi"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Validasi Jurnal */}
+      <ValidasiJurnalModal
+        isOpen={!!validasiJurnal}
+        onClose={() => setValidasiJurnal(null)}
         onSuccess={loadData}
-        jurnal={revisiJurnal}
+        jurnal={validasiJurnal}
       />
+
+      {/* Modal Validasi Absensi */}
+      <ValidasiAbsensiModal
+        isOpen={!!validasiAbsensi}
+        onClose={() => setValidasiAbsensi(null)}
+        onSuccess={loadData}
+        absensi={validasiAbsensi}
+      />
+
+      {/* Modal Preview Foto */}
+      {previewPhoto && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="relative max-w-xl max-h-[85vh] bg-card rounded-2xl overflow-hidden shadow-2xl border border-border animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+              <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-blue-600" />
+                <span>{previewPhoto.title}</span>
+              </h4>
+              <button
+                onClick={() => setPreviewPhoto(null)}
+                className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 flex items-center justify-center bg-black/5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.title}
+                className="max-h-[70vh] w-auto object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

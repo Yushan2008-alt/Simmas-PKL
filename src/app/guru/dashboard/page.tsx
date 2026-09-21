@@ -246,79 +246,73 @@ export default function GuruDashboardPage() {
       </div>
 
       {/* 3. TWO EQUAL BOTTOM COLUMNS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Left Column: Jurnal Perlu Evaluasi */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4 flex flex-col justify-between min-h-[220px]">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-1 border-b border-border/60">
-              <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <span>Jurnal Perlu Evaluasi</span>
-              </h3>
-            </div>
-
-            {pendingJurnals.length === 0 ? (
-              <div className="py-12 text-center text-xs text-muted-foreground font-medium">
-                Semua jurnal bimbingan Anda sudah dievaluasi.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pendingJurnals.slice(0, 3).map((j) => (
-                  <div
-                    key={j.id}
-                    className="p-3.5 rounded-xl border border-amber-200/80 bg-amber-500/5 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-foreground">
-                        {j.student?.name}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {j.date}
-                      </span>
-                    </div>
-                    <p className="text-xs text-foreground/80 line-clamp-2 leading-relaxed">
-                      {j.activity}
-                    </p>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setRevisiJurnal(j)}
-                        className="h-7 text-[11px] font-semibold rounded-lg text-amber-700 hover:bg-amber-100/50 border-amber-300"
-                      >
-                        <MessageSquare className="h-3 w-3 mr-1" />
-                        <span>Revisi</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleApproveJurnal(j)}
-                        className="h-7 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
-                      >
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        <span>Setujui</span>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="pt-2 text-center border-t border-border/40">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs flex flex-col h-full space-y-4">
+          <div className="flex items-center justify-between pb-1 border-b border-border/60">
+            <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <span>Jurnal Perlu Evaluasi</span>
+            </h3>
             <Link
               href="/guru/jurnal"
-              className="text-xs font-semibold text-amber-600 hover:text-amber-700 hover:underline inline-flex items-center gap-1"
+              className="text-xs font-semibold text-blue-600 hover:underline"
             >
-              <span>Lihat semua tugas ({pendingJurnals.length})</span>
-              <span>&gt;</span>
+              Lihat Semua
             </Link>
           </div>
+
+          {pendingJurnals.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center py-8 text-center text-xs text-muted-foreground font-medium">
+              Semua jurnal bimbingan Anda sudah dievaluasi.
+            </div>
+          ) : (
+            <div className="space-y-3 flex-1">
+              {pendingJurnals.slice(0, 3).map((j) => (
+                <div
+                  key={j.id}
+                  className="p-3.5 rounded-xl border border-amber-200/80 bg-amber-500/5 space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-foreground">
+                      {j.student?.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {j.date}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/80 line-clamp-2 leading-relaxed">
+                    {j.activity}
+                  </p>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setRevisiJurnal(j)}
+                      className="h-7 text-[11px] font-semibold rounded-lg text-amber-700 hover:bg-amber-100/50 border-amber-300"
+                    >
+                      <MessageSquare className="h-3 w-3 mr-1" />
+                      <span>Revisi</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveJurnal(j)}
+                      className="h-7 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                    >
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      <span>Setujui</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right Column: Daftar Siswa Bimbingan */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4 flex flex-col justify-between min-h-[220px]">
-          <div className="space-y-3">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs flex flex-col h-full space-y-4">
+          <div className="space-y-3 flex-1 flex flex-col">
             <div className="flex items-center justify-between pb-1 border-b border-border/60">
               <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
                 <Users className="h-4 w-4 text-blue-600" />
@@ -333,7 +327,7 @@ export default function GuruDashboardPage() {
             </div>
 
             {summaries.length === 0 ? (
-              <div className="py-12 text-center text-xs text-muted-foreground font-medium">
+              <div className="flex-1 flex items-center justify-center py-8 text-center text-xs text-muted-foreground font-medium">
                 Belum ada siswa bimbingan yang ditempatkan.
               </div>
             ) : (

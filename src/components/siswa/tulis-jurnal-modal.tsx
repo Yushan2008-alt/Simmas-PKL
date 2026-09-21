@@ -1,48 +1,47 @@
 "use client";
 
 import * as React from "react";
-import { X, Edit3, MessageSquare, AlertCircle, FileText, UploadCloud, Trash2 } from "lucide-react";
+import { X, BookOpen, UploadCloud, Image as ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Jurnal } from "@/types/database";
-import { updateJurnalSiswa } from "@/lib/supabase/services";
+import { createJurnalSiswa } from "@/lib/supabase/services";
 
-interface EditJurnalModalProps {
+interface TulisJurnalModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  jurnal: Jurnal | null;
+  studentId: string;
 }
 
-export function EditJurnalModal({
+export function TulisJurnalModal({
   isOpen,
   onClose,
   onSuccess,
-  jurnal,
-}: EditJurnalModalProps) {
+  studentId,
+}: TulisJurnalModalProps) {
   const [date, setDate] = React.useState("");
   const [activity, setActivity] = React.useState("");
   const [kendala, setKendala] = React.useState("");
   const [tindakLanjut, setTindakLanjut] = React.useState("");
   const [photoUrl, setPhotoUrl] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
-    if (isOpen && jurnal) {
-      setDate(jurnal.date || "");
-      setActivity(jurnal.activity || "");
-      setKendala(jurnal.kendala || "");
-      setTindakLanjut(jurnal.tindak_lanjut || "");
-      setPhotoUrl(jurnal.photo_url || null);
+    if (isOpen) {
+      const today = new Date().toISOString().split("T")[0];
+      setDate(today);
+      setActivity("");
+      setKendala("");
+      setTindakLanjut("");
+      setPhotoUrl(null);
     }
-  }, [isOpen, jurnal]);
+  }, [isOpen]);
 
-  if (!isOpen || !jurnal) return null;
-
-  const isRevision = jurnal.status === "Perlu Revisi";
+  if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,7 +60,7 @@ export function EditJurnalModal({
     const reader = new FileReader();
     reader.onload = () => {
       setPhotoUrl(reader.result as string);
-      toast.success("Foto dokumentasi diperbarui");
+      toast.success("Foto dokumentasi berhasil dipilih");
     };
     reader.readAsDataURL(file);
   };
@@ -70,31 +69,28 @@ export function EditJurnalModal({
     e.preventDefault();
 
     if (!activity.trim()) {
-      toast.error("Rincian kegiatan tidak boleh kosong.");
+      toast.error("Rincian kegiatan wajib diisi");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await updateJurnalSiswa(jurnal.id, {
-        date,
-        activity: activity.trim(),
-        kendala: kendala.trim(),
-        tindak_lanjut: tindakLanjut.trim(),
-        photo_url: photoUrl || "",
-      });
-
-      toast.success(
-        isRevision ? "Jurnal berhasil diperbaiki!" : "Jurnal berhasil diperbarui!",
-        {
-          description:
-            "Status jurnal kini 'Pending' untuk ditinjau ulang oleh guru pembimbing.",
-        }
+      await createJurnalSiswa(
+        studentId,
+        date || new Date().toISOString().split("T")[0],
+        activity.trim(),
+        kendala.trim(),
+        tindakLanjut.trim(),
+        photoUrl || undefined
       );
+
+      toast.success("Jurnal Kegiatan Berhasil Dikirim!", {
+        description: "Laporan jurnal Anda telah tersimpan dengan status 'Pending'.",
+      });
       onSuccess();
       onClose();
     } catch (err: any) {
-      toast.error("Gagal memperbarui jurnal", {
+      toast.error("Gagal mengirim jurnal", {
         description: err?.message || "Terjadi kesalahan sistem.",
       });
     } finally {
@@ -105,30 +101,18 @@ export function EditJurnalModal({
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200">
       <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-card rounded-2xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div
-          className={`flex items-center justify-between p-5 sm:p-6 border-b border-border ${
-            isRevision ? "bg-amber-500/5" : "bg-card"
-          }`}
-        >
+        {/* Header (persis gambar 3) */}
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-border bg-card">
           <div className="flex items-center gap-3">
-            <div
-              className={`p-2.5 rounded-xl ${
-                isRevision
-                  ? "bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-300"
-                  : "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"
-              }`}
-            >
-              <Edit3 className="h-5 w-5" />
+            <div className="p-2.5 rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-300">
+              <BookOpen className="h-5 w-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-foreground">
-                {isRevision ? "Perbaiki Jurnal Kegiatan" : "Edit Jurnal Kegiatan"}
+                Tulis Jurnal Kegiatan
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {isRevision
-                  ? "Lengkapi dan sesuaikan laporan Anda berdasarkan masukan guru pembimbing."
-                  : "Ubah rincian kegiatan atau informasi laporan jurnal harian."}
+                Catat aktivitas yang Anda lakukan di tempat magang hari ini.
               </p>
             </div>
           </div>
@@ -141,21 +125,8 @@ export function EditJurnalModal({
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
+        {/* Scrollable Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-          {/* Catatan dari Guru Pembimbing jika status Revisi */}
-          {jurnal.teacher_feedback && (
-            <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-300 dark:bg-amber-950/20 dark:border-amber-900 space-y-1">
-              <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
-                <span>Catatan Revisi dari Guru Pembimbing:</span>
-              </p>
-              <p className="text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed italic pl-5">
-                &ldquo;{jurnal.teacher_feedback}&rdquo;
-              </p>
-            </div>
-          )}
-
           {/* 1. Tanggal Pelaksanaan */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-foreground">
@@ -177,10 +148,10 @@ export function EditJurnalModal({
             </label>
             <Textarea
               required
+              placeholder="Apa yang Anda pelajari atau kerjakan hari ini?"
               value={activity}
               onChange={(e) => setActivity(e.target.value)}
               rows={3}
-              placeholder="Apa yang Anda pelajari atau kerjakan hari ini?"
               className="rounded-xl resize-none bg-muted/20 border-border text-xs focus:bg-background transition-all"
             />
           </div>
@@ -236,16 +207,8 @@ export function EditJurnalModal({
                   className="h-16 w-16 rounded-lg object-cover border border-border shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">
-                    Foto Dokumentasi Terlampir
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-[11px] text-primary hover:underline block mt-0.5"
-                  >
-                    Ganti Foto
-                  </button>
+                  <p className="text-xs font-semibold text-foreground truncate">Foto Dokumentasi Terlampir</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Siap dikirim bersama jurnal</p>
                 </div>
                 <Button
                   type="button"
@@ -273,13 +236,12 @@ export function EditJurnalModal({
             )}
           </div>
 
-          {/* Footer Actions */}
+          {/* Footer Buttons */}
           <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={isSubmitting}
               className="rounded-xl h-10 px-5 text-xs font-semibold"
             >
               Batal
@@ -287,17 +249,9 @@ export function EditJurnalModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className={`rounded-xl h-10 px-6 font-bold text-xs text-white shadow-xs ${
-                isRevision
-                  ? "bg-amber-600 hover:bg-amber-700"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
+              className="rounded-xl h-10 px-6 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
             >
-              {isSubmitting
-                ? "Menyimpan..."
-                : isRevision
-                ? "Kirim Perbaikan Jurnal"
-                : "Simpan Perubahan"}
+              {isSubmitting ? "Mengirim..." : "Kirim Jurnal"}
             </Button>
           </div>
         </form>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, ExternalLink, Radio, ShieldCheck, LogOut, ChevronDown } from "lucide-react";
+import { Menu, ShieldCheck, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getActiveGuru, getDefaultGuru, logoutUser } from "@/lib/supabase/services";
 import { toast } from "sonner";
@@ -24,11 +24,13 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const current = pageTitles[pathname] || { title: "Portal Guru", category: "SIMMAS" };
-  const [guru, setGuru] = React.useState(() => getActiveGuru());
+  const [mounted, setMounted] = React.useState(false);
+  const [guru, setGuru] = React.useState(() => getDefaultGuru());
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    setMounted(true);
     setGuru(getActiveGuru());
 
     const handleAuthChange = () => setGuru(getActiveGuru());
@@ -96,22 +98,6 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
 
       {/* Right Actions */}
       <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Realtime Status Pill */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-          <Radio className="h-2.5 w-2.5 animate-pulse text-emerald-500" />
-          <span>REAL-TIME AKTIF</span>
-        </div>
-
-        {/* View Landing */}
-        <Link
-          href="/"
-          target="_blank"
-          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          <span>Lihat Web</span>
-        </Link>
-
         {/* Interactive Teacher Account Badge & Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
@@ -123,19 +109,16 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
             aria-expanded={dropdownOpen}
             aria-label="Menu Akun Guru"
           >
-            <div
-              suppressHydrationWarning
-              className="h-8 w-8 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs"
-            >
-              {guruInitials}
+            <div className="h-8 w-8 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs">
+              {mounted ? guruInitials : "G"}
             </div>
 
             <div className="hidden md:block text-left min-w-0 max-w-[150px]">
-              <p suppressHydrationWarning className="text-xs font-bold text-foreground leading-tight truncate">
-                {guru.name}
+              <p className="text-xs font-bold text-foreground leading-tight truncate">
+                {mounted ? guru.name : "Memuat..."}
               </p>
-              <p suppressHydrationWarning className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
-                NIP: {guru.nip}
+              <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
+                NIP: {mounted ? guru.nip : "-"}
               </p>
             </div>
 
@@ -152,17 +135,14 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
             <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-border bg-card p-3 shadow-xl z-50 animate-in fade-in-0 zoom-in-95 duration-150">
               {/* Account Profile Details */}
               <div className="flex items-start gap-3 p-2.5 rounded-xl bg-muted/40 mb-2">
-                <div
-                  suppressHydrationWarning
-                  className="h-10 w-10 rounded-xl bg-blue-600/15 text-blue-600 flex items-center justify-center font-extrabold text-sm shrink-0"
-                >
+                <div className="h-10 w-10 rounded-xl bg-blue-600/15 text-blue-600 flex items-center justify-center font-extrabold text-sm shrink-0">
                   {guruInitials}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p suppressHydrationWarning className="text-xs font-extrabold text-foreground truncate">
+                  <p className="text-xs font-extrabold text-foreground truncate">
                     {guru.name}
                   </p>
-                  <p suppressHydrationWarning className="text-[11px] text-muted-foreground truncate mt-0.5">
+                  <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {guru.email}
                   </p>
                   <div className="flex items-center gap-1.5 mt-1.5">
@@ -178,14 +158,14 @@ export function GuruHeader({ onOpenMobileMenu }: HeaderProps) {
               <div className="space-y-1.5 px-2 py-1.5 text-xs text-muted-foreground border-b border-border/60 pb-2 mb-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium">NIP</span>
-                  <span suppressHydrationWarning className="text-[11px] font-bold text-foreground font-mono">
+                  <span className="text-[11px] font-bold text-foreground font-mono">
                     {guru.nip}
                   </span>
                 </div>
                 {guru.department && (
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium">Departemen</span>
-                    <span suppressHydrationWarning className="text-[11px] font-bold text-foreground truncate max-w-[150px]">
+                    <span className="text-[11px] font-bold text-foreground truncate max-w-[150px]">
                       {guru.department}
                     </span>
                   </div>
